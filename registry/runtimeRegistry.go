@@ -1,0 +1,90 @@
+package runtime_registry
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
+	"time"
+)
+
+const (
+	Source_ContentType_Text   SourceContentType = iota
+	Source_ContentType_Binary                   = iota
+)
+
+type (
+	SourceContentType int
+
+	StartOptions struct {
+		EntryPoint string
+		Arguments  []interface{}
+	}
+
+	runtimeReference struct {
+		Name    string `json:"name"`
+		Version int    `json:"version"`
+	}
+
+	CodeDescriptor struct {
+		Source     []byte            `json:"source"`
+		SourceType SourceContentType `json:"source_type"`
+		BuildHash  string            `json:"build_hash"`
+	}
+
+	ModuleBindingConfiguration struct {
+		Settings map[string]interface{} `json:"configuration"`
+	}
+	ModuleBinding struct {
+		Configuration ModuleBindingConfiguration `json:"configuration"`
+		ContextKey    string                     `json:"context_key"`
+	}
+
+	Bindings struct {
+		GlobalModules map[string]ModuleBinding `json:"global_modules"`
+		KindeAPIs     map[string]ModuleBinding `json:"kinde_apis"`
+	}
+
+	RuntimeLimits struct {
+		MaxExecutionDuration time.Duration `json:"max_execution_duration"`
+	}
+
+	WorkflowDescriptor struct {
+		runtime         runtimeReference
+		ProcessedSource CodeDescriptor `json:"processed_source"`
+		Bindings        Bindings       `json:"bindings"`
+		Limits          RuntimeLimits  `json:"runtime_limits"`
+	}
+
+	Result interface {
+		GetExitResult() interface{}
+	}
+
+	Runner interface {
+		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (Result, error)
+	}
+)
+
+var runtimes map[string]func() Runner = map[string]func() Runner{}
+
+// not thread safe, should be called as part of init
+func RegisterRuntime(name string, factory func() Runner) {
+	runtimes[name] = factory
+}
+
+// Resolves runtime from available registrations
+func ResolveRuntime(name string) (Runner, error) {
+	if factory, ok := runtimes[name]; ok {
+		return factory(), nil
+	}
+	return nil, fmt.Errorf("runtime %v not found", name)
+}
+
+// Returns a hash of the workflow descriptor
+func (wd *WorkflowDescriptor) GetHash() string {
+	base := fmt.Sprintf("%v-%v", wd.ProcessedSource.BuildHash, string(wd.ProcessedSource.Source))
+	sha := sha256.New()
+	sha.Write([]byte(base))
+	result := base64.StdEncoding.EncodeToString(sha.Sum(nil))
+	return fmt.Sprintf("%v", result)
+}
