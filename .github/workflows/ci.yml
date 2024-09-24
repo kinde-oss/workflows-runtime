@@ -22,6 +22,6 @@ jobs:
       run: go test -v ./...
 
     - id: govulncheck
-      uses: golang/govulncheck-action@1.0.3
+      uses: golang/govulncheck-action@v1.0.3
       with:
          go-package: ./...
