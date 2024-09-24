@@ -1,26 +1,35 @@
 package builder
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
+	_ "github.com/kinde-oss/workflows-runtime/gojaRuntime"
+	runtimesRegistry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
 type (
+	WorkflowSettings struct {
+		ID    string
+		Name  string
+		Other map[string]interface{}
+	}
 	BundledContent struct {
-		Source []byte
-		//Path   string
-		Hash string
+		Source   []byte
+		Hash     string
+		Settings WorkflowSettings
 	}
 
 	BundlerResult struct {
-		Boundle BundledContent
-		Errors  []error
+		Bundle BundledContent
+		Errors []error
 	}
 
 	BundlerOptions struct {
 		WorkingFolder string
-		EntryPoint    string
+		EntryPoints   []string
 	}
 
 	WorkflowBundler interface {
@@ -54,7 +63,7 @@ func (b *builder) Bundle() BundlerResult {
 		Platform:         api.PlatformDefault,
 		LogLevel:         api.LogLevelError,
 		Charset:          api.CharsetUTF8,
-		EntryPoints:      []string{b.buildOptions.EntryPoint},
+		EntryPoints:      b.buildOptions.EntryPoints,
 		Bundle:           true,
 		Write:            false,
 		TreeShaking:      api.TreeShakingTrue,
@@ -73,10 +82,10 @@ func (b *builder) Bundle() BundlerResult {
 		}
 
 		file := tr.OutputFiles[0]
-		result.Boundle = BundledContent{
-			Source: file.Contents,
-			//Path:   file.Path,
-			Hash: file.Hash,
+		result.Bundle = BundledContent{
+			Source:   file.Contents,
+			Hash:     file.Hash,
+			Settings: result.discoverSettings(file.Contents),
 		}
 	}
 
@@ -84,9 +93,34 @@ func (b *builder) Bundle() BundlerResult {
 }
 
 func (br *BundlerResult) HasOutput() bool {
-	return len(br.Boundle.Source) > 0
+	return len(br.Bundle.Source) > 0
 }
 
 func (br *BundlerResult) addError(err error) {
 	br.Errors = append(br.Errors, err)
+}
+
+func (br *BundlerResult) discoverSettings(source []byte) WorkflowSettings {
+	goja, _ := runtimesRegistry.ResolveRuntime("goja")
+	introspectResult, _ := goja.Introspect(context.Background(), runtimesRegistry.WorkflowDescriptor{
+		ProcessedSource: runtimesRegistry.CodeDescriptor{
+			Source:     source,
+			SourceType: runtimesRegistry.Source_ContentType_Text,
+		},
+		Bindings: runtimesRegistry.Bindings{
+			GlobalModules: map[string]runtimesRegistry.ModuleBinding{
+				"console": {},
+				"url":     {},
+				"module":  {},
+				"kinde":   {},
+			},
+		},
+		Limits: runtimesRegistry.RuntimeLimits{
+			MaxExecutionDuration: 30 * time.Second,
+		},
+	})
+
+	return WorkflowSettings{
+		ID: introspectResult.GetID(),
+	}
 }

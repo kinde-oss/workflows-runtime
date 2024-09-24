@@ -13,11 +13,12 @@ func Test_WorkflowBundler(t *testing.T) {
 
 	workflowBuilder := newWorkflowBundler(BundlerOptions{
 		WorkingFolder: workflowPath,
-		EntryPoint:    "./*.ts",
+		EntryPoints:   []string{"workflow.ts"},
 	})
 	bundlerResult := workflowBuilder.Bundle()
 
 	assert := assert.New(t)
 	assert.Nil(bundlerResult.Errors)
-	assert.NotEmpty(bundlerResult.Boundle.Source)
+	assert.NotEmpty(bundlerResult.Bundle.Source)
+	assert.Equal("tokenGen", bundlerResult.Bundle.Settings.ID)
 }

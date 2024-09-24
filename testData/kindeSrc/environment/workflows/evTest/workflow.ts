@@ -6,14 +6,12 @@ export const workflowSettings = {
     resetClaims: true
 };
 
-export default {
-    async handle(event: any) {
+export default async function handle (event: any) {
         kinde.idToken.setCustomClaim('random', 'test');
         kinde.accessToken.setCustomClaim('test2', {"test2": hello});
         console.log('logging from action', {"balh": "blah"});
         await kinde.fetch("http://google.com");
         console.error('error log');
         return 'testing return';
-    },
 
 }

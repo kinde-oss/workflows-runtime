@@ -56,15 +56,20 @@ type (
 		Limits          RuntimeLimits  `json:"runtime_limits"`
 	}
 
-	Result interface {
+	ExecutionResult interface {
 		GetExitResult() interface{}
 		GetConsoleLog() []interface{}
 		GetConsoleError() []interface{}
 		GetContext() map[string]interface{}
 	}
 
+	IntrospectionResult interface {
+		GetID() string
+	}
+
 	Runner interface {
-		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (Result, error)
+		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (ExecutionResult, error)
+		Introspect(ctx context.Context, workflow WorkflowDescriptor) (IntrospectionResult, error)
 	}
 )
 

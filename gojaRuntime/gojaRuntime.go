@@ -23,7 +23,16 @@ type (
 		Context      map[string]interface{} `json:"context"`
 		ExitResult   interface{}            `json:"exit_result"`
 	}
+
+	introspectionResult struct {
+		ID string `json:"id"`
+	}
 )
+
+// GetID implements runtime_registry.IntrospectionResult.
+func (i introspectionResult) GetID() string {
+	return i.ID
+}
 
 // GetConsoleError implements runtime_registry.Result.
 func (a *actionResult) GetConsoleError() []interface{} {
@@ -82,68 +91,43 @@ func newGojaRunner() runtimesRegistry.Runner {
 	return &runner
 }
 
-func (e *gojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, startOptions runtimesRegistry.StartOptions) (runtimesRegistry.Result, error) {
+// Introspect implements runtime_registry.Runner.
+func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
+	_, returnErr := setupVM(ctx, vm, e, workflow)
 
-	registry.Enable(vm)
-
-	e.maxExecutionTimeout(ctx, vm, workflow.Limits.MaxExecutionDuration)
-	vm.SetTimeSource(func() time.Time { return time.Now() }) //static time source
-
-	executionResult := &actionResult{
-		ConsoleLog:   []interface{}{},
-		ConsoleError: []interface{}{},
-		Context:      map[string]interface{}{},
+	if returnErr != nil {
+		return nil, returnErr
 	}
-
-	for name, binding := range workflow.Bindings.GlobalModules {
-		if module, ok := availableModules[name]; ok {
-			module(e, vm, vm.NewObject(), executionResult, binding)
-		}
-	}
-
-	vm.Set("kinde", vm.NewObject())
-	for name, binding := range workflow.Bindings.KindeAPIs {
-		kindeMountPoint := vm.Get("kinde").(*goja.Object)
-		if apiFunc, ok := kindeAPIs[name]; ok {
-			kindeMountPoint.Set(name, e.callRegisteredAPI(binding, apiFunc))
-		}
-	}
-
-	workflowHash := workflow.GetHash()
-	program, err := e.Cache.cacheProgram(workflowHash, func() (*goja.Program, error) {
-		ast, err := goja.Parse("main", string(workflow.ProcessedSource.Source))
-
-		if err != nil {
-			return nil, fmt.Errorf("error parsing %w", err)
-		}
-
-		program, err := goja.CompileAST(ast, false)
-
-		if err != nil {
-			return nil, fmt.Errorf("error compiling %w", err)
-		}
-
-		return program, nil
-
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = vm.RunProgram(program)
-	if err != nil {
-		return nil, fmt.Errorf("%v", err.Error())
-	}
-
 	module := vm.Get("module").ToObject(vm)
 	exports := module.Get("exports").ToObject(vm)
 
 	settingsExport := exports.Get("workflowSettings")
+
+	introspectionResult := introspectionResult{}
+
 	if settingsExport != nil {
-		executionResult.Context["workflowSettings"] = settingsExport.Export()
+		settings := settingsExport.Export().(map[string]interface{})
+
+		if val, ok := settings["id"]; ok {
+			introspectionResult.ID = val.(string)
+		}
 	}
+
+	return introspectionResult, nil
+}
+
+func (e *gojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, startOptions runtimesRegistry.StartOptions) (runtimesRegistry.ExecutionResult, error) {
+
+	vm := goja.New()
+	executionResult, returnErr := setupVM(ctx, vm, e, workflow)
+
+	if returnErr != nil {
+		return executionResult, returnErr
+	}
+
+	module := vm.Get("module").ToObject(vm)
+	exports := module.Get("exports").ToObject(vm)
 
 	defaultExport := exports.Get("default")
 	if defaultExport == nil {
@@ -193,6 +177,61 @@ func (e *gojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 
 	executionResult.ExitResult = promise.Result().Export()
 
+	return executionResult, nil
+}
+
+func setupVM(ctx context.Context, vm *goja.Runtime, runner *gojaRunnerV1, workflow runtimesRegistry.WorkflowDescriptor) (*actionResult, error) {
+	registry.Enable(vm)
+
+	runner.maxExecutionTimeout(ctx, vm, workflow.Limits.MaxExecutionDuration)
+	vm.SetTimeSource(func() time.Time { return time.Now() })
+
+	executionResult := &actionResult{
+		ConsoleLog:   []interface{}{},
+		ConsoleError: []interface{}{},
+		Context:      map[string]interface{}{},
+	}
+
+	for name, binding := range workflow.Bindings.GlobalModules {
+		if module, ok := availableModules[name]; ok {
+			module(runner, vm, vm.NewObject(), executionResult, binding)
+		}
+	}
+
+	vm.Set("kinde", vm.NewObject())
+	for name, binding := range workflow.Bindings.KindeAPIs {
+		kindeMountPoint := vm.Get("kinde").(*goja.Object)
+		if apiFunc, ok := kindeAPIs[name]; ok {
+			kindeMountPoint.Set(name, runner.callRegisteredAPI(binding, apiFunc))
+		}
+	}
+
+	workflowHash := workflow.GetHash()
+	program, err := runner.Cache.cacheProgram(workflowHash, func() (*goja.Program, error) {
+		ast, err := goja.Parse("main", string(workflow.ProcessedSource.Source))
+
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %w", err)
+		}
+
+		program, err := goja.CompileAST(ast, false)
+
+		if err != nil {
+			return nil, fmt.Errorf("error compiling %w", err)
+		}
+
+		return program, nil
+
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = vm.RunProgram(program)
+	if err != nil {
+		return nil, fmt.Errorf("%v", err.Error())
+	}
 	return executionResult, nil
 }
 
