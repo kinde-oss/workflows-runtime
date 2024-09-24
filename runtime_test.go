@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	gojaRuntime "github.com/kinde-oss/workflows-runtime/gojaRuntime/gojaRuntime"
-	registry "github.com/kinde-oss/workflows-runtime/gojaRuntime/registry"
+	gojaRuntime "github.com/kinde-oss/workflows-runtime/gojaRuntime"
+	registry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
 func Test_GojaRuntime(t *testing.T) {

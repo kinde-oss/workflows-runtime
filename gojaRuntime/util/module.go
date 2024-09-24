@@ -4,7 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dop251/goja"
-	"github.com/kinde-oss/workflows-runtime/gojaRuntime/gojaRuntime/require"
+	"github.com/kinde-oss/workflows-runtime/gojaRuntime/require"
 )
 
 const ModuleName = "util"

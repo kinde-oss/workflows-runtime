@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/kinde-oss/workflows-runtime/gojaRuntime/gojaRuntime/errors"
+	"github.com/kinde-oss/workflows-runtime/gojaRuntime/errors"
 
 	"golang.org/x/net/idna"
 )

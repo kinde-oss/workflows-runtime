@@ -1,4 +1,4 @@
-module github.com/kinde-oss/workflows-runtime/gojaRuntime
+module github.com/kinde-oss/workflows-runtime
 
 go 1.22.6
 

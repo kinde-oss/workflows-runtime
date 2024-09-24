@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/kinde-oss/workflows-runtime/gojaRuntime/gojaRuntime/errors"
+	"github.com/kinde-oss/workflows-runtime/gojaRuntime/errors"
 
 	"github.com/dop251/goja"
 )

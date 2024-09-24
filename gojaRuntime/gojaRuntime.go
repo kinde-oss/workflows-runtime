@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/kinde-oss/workflows-runtime/gojaRuntime/gojaRuntime/require"
-	urlModule "github.com/kinde-oss/workflows-runtime/gojaRuntime/gojaRuntime/url"
-	runtimesRegistry "github.com/kinde-oss/workflows-runtime/gojaRuntime/registry"
+	"github.com/kinde-oss/workflows-runtime/gojaRuntime/require"
+	urlModule "github.com/kinde-oss/workflows-runtime/gojaRuntime/url"
+	runtimesRegistry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
 type (
