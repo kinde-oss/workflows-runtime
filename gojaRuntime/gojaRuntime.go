@@ -25,6 +25,21 @@ type (
 	}
 )
 
+// GetConsoleError implements runtime_registry.Result.
+func (a *actionResult) GetConsoleError() []interface{} {
+	return a.ConsoleError
+}
+
+// GetConsoleLog implements runtime_registry.Result.
+func (a *actionResult) GetConsoleLog() []interface{} {
+	return a.ConsoleLog
+}
+
+// GetContext implements runtime_registry.Result.
+func (a *actionResult) GetContext() map[string]interface{} {
+	return a.Context
+}
+
 func (a *actionResult) GetExitResult() interface{} {
 	return a.ExitResult
 }

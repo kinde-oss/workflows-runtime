@@ -58,6 +58,9 @@ type (
 
 	Result interface {
 		GetExitResult() interface{}
+		GetConsoleLog() []interface{}
+		GetConsoleError() []interface{}
+		GetContext() map[string]interface{}
 	}
 
 	Runner interface {
