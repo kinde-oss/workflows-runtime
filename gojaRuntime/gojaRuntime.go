@@ -23,15 +23,42 @@ type (
 		Context      map[string]interface{} `json:"context"`
 		ExitResult   interface{}            `json:"exit_result"`
 	}
+	introspectedExport struct {
+		value interface{}
+	}
 
 	introspectionResult struct {
-		ID string `json:"id"`
+		exports map[string]introspectedExport
 	}
 )
 
-// GetID implements runtime_registry.IntrospectionResult.
-func (i introspectionResult) GetID() string {
-	return i.ID
+// HasExport implements runtime_registry.IntrospectedExport.
+func (i introspectedExport) HasExport() bool {
+	return i.value != nil
+}
+
+// Value implements runtime_registry.IntrospectedExport.
+func (i introspectedExport) Value() interface{} {
+	return i.value
+}
+
+// ValueAsMap implements runtime_registry.IntrospectedExport.
+func (i introspectedExport) ValueAsMap() map[string]interface{} {
+	if i.value == nil {
+		return map[string]interface{}{}
+	}
+	return i.value.(map[string]interface{})
+}
+
+// GetExport implements runtime_registry.IntrospectionResult.
+func (i introspectionResult) GetExport(name string) runtimesRegistry.IntrospectedExport {
+	return i.exports[name]
+}
+
+func (i introspectionResult) recordExport(name string, value interface{}) {
+	i.exports[name] = introspectedExport{
+		value: value,
+	}
 }
 
 // GetConsoleError implements runtime_registry.Result.
@@ -92,7 +119,7 @@ func newGojaRunner() runtimesRegistry.Runner {
 }
 
 // Introspect implements runtime_registry.Runner.
-func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor) (runtimesRegistry.IntrospectionResult, error) {
+func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.InstrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
 	_, returnErr := setupVM(ctx, vm, e, workflow)
 
@@ -102,15 +129,17 @@ func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry
 	module := vm.Get("module").ToObject(vm)
 	exports := module.Get("exports").ToObject(vm)
 
-	settingsExport := exports.Get("workflowSettings")
+	introspectionResult := introspectionResult{
+		exports: map[string]introspectedExport{},
+	}
 
-	introspectionResult := introspectionResult{}
-
-	if settingsExport != nil {
-		settings := settingsExport.Export().(map[string]interface{})
-
-		if val, ok := settings["id"]; ok {
-			introspectionResult.ID = val.(string)
+	for _, exportToIntrospect := range options.Exports {
+		exportIntrospect := exports.Get(exportToIntrospect)
+		if exportIntrospect != nil {
+			mapped := exportIntrospect.Export()
+			introspectionResult.recordExport(exportToIntrospect, mapped)
+		} else {
+			introspectionResult.recordExport(exportToIntrospect, nil)
 		}
 	}
 

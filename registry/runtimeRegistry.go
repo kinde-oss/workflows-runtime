@@ -63,13 +63,23 @@ type (
 		GetContext() map[string]interface{}
 	}
 
+	IntrospectedExport interface {
+		HasExport() bool
+		Value() interface{}
+		ValueAsMap() map[string]interface{}
+	}
+
 	IntrospectionResult interface {
-		GetID() string
+		GetExport(string) IntrospectedExport
+	}
+
+	InstrospectionOptions struct {
+		Exports []string
 	}
 
 	Runner interface {
 		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (ExecutionResult, error)
-		Introspect(ctx context.Context, workflow WorkflowDescriptor) (IntrospectionResult, error)
+		Introspect(ctx context.Context, workflow WorkflowDescriptor, options InstrospectionOptions) (IntrospectionResult, error)
 	}
 )
 

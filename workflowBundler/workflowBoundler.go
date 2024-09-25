@@ -12,19 +12,18 @@ import (
 
 type (
 	WorkflowSettings struct {
-		ID    string
-		Name  string
-		Other map[string]interface{}
+		ID    string                 `json:"id"`
+		Other map[string]interface{} `json:"other"`
 	}
 	BundledContent struct {
-		Source   []byte
-		Hash     string
-		Settings WorkflowSettings
+		Source   []byte           `json:"source"`
+		Hash     string           `json:"hash"`
+		Settings WorkflowSettings `json:"settings"`
 	}
 
 	BundlerResult struct {
-		Bundle BundledContent
-		Errors []error
+		Bundle BundledContent `json:"bundle"`
+		Errors []error        `json:"errors"`
 	}
 
 	BundlerOptions struct {
@@ -37,13 +36,13 @@ type (
 	}
 
 	builder struct {
-		buildOptions BundlerOptions
+		bundleOptions BundlerOptions
 	}
 )
 
 func newWorkflowBundler(options BundlerOptions) WorkflowBundler {
 	return &builder{
-		buildOptions: options,
+		bundleOptions: options,
 	}
 }
 
@@ -54,7 +53,7 @@ func (b *builder) Bundle() BundlerResult {
 			".tsx": api.LoaderTSX,
 			".ts":  api.LoaderTS,
 		},
-		AbsWorkingDir:    b.buildOptions.WorkingFolder,
+		AbsWorkingDir:    b.bundleOptions.WorkingFolder,
 		Target:           api.ESNext,
 		Format:           api.FormatCommonJS,
 		Sourcemap:        api.SourceMapInline,
@@ -63,7 +62,7 @@ func (b *builder) Bundle() BundlerResult {
 		Platform:         api.PlatformDefault,
 		LogLevel:         api.LogLevelError,
 		Charset:          api.CharsetUTF8,
-		EntryPoints:      b.buildOptions.EntryPoints,
+		EntryPoints:      b.bundleOptions.EntryPoints,
 		Bundle:           true,
 		Write:            false,
 		TreeShaking:      api.TreeShakingTrue,
@@ -89,6 +88,10 @@ func (b *builder) Bundle() BundlerResult {
 		}
 	}
 
+	if result.Bundle.Settings.ID == "" {
+		result.addError(errors.New("workflow id not found, please export workflowSettings.id"))
+	}
+
 	return result
 }
 
@@ -102,25 +105,42 @@ func (br *BundlerResult) addError(err error) {
 
 func (br *BundlerResult) discoverSettings(source []byte) WorkflowSettings {
 	goja, _ := runtimesRegistry.ResolveRuntime("goja")
-	introspectResult, _ := goja.Introspect(context.Background(), runtimesRegistry.WorkflowDescriptor{
-		ProcessedSource: runtimesRegistry.CodeDescriptor{
-			Source:     source,
-			SourceType: runtimesRegistry.Source_ContentType_Text,
-		},
-		Bindings: runtimesRegistry.Bindings{
-			GlobalModules: map[string]runtimesRegistry.ModuleBinding{
-				"console": {},
-				"url":     {},
-				"module":  {},
-				"kinde":   {},
+	introspectResult, _ := goja.Introspect(context.Background(),
+		runtimesRegistry.WorkflowDescriptor{
+			ProcessedSource: runtimesRegistry.CodeDescriptor{
+				Source:     source,
+				SourceType: runtimesRegistry.Source_ContentType_Text,
+			},
+			Bindings: runtimesRegistry.Bindings{
+				GlobalModules: map[string]runtimesRegistry.ModuleBinding{
+					"console": {},
+					"url":     {},
+					"module":  {},
+					"kinde":   {},
+				},
+			},
+			Limits: runtimesRegistry.RuntimeLimits{
+				MaxExecutionDuration: 30 * time.Second,
 			},
 		},
-		Limits: runtimesRegistry.RuntimeLimits{
-			MaxExecutionDuration: 30 * time.Second,
-		},
-	})
+		runtimesRegistry.InstrospectionOptions{
+			Exports: []string{"workflowSettings"},
+		})
+
+	settings := introspectResult.GetExport("workflowSettings").ValueAsMap()
+
+	var workflowID string
+
+	if id, ok := settings["id"]; ok {
+
+		switch idTyped := id.(type) {
+		case string:
+			workflowID = idTyped
+		}
+	}
 
 	return WorkflowSettings{
-		ID: introspectResult.GetID(),
+		ID:    workflowID,
+		Other: settings,
 	}
 }
