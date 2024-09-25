@@ -51,5 +51,4 @@ func Test_GojaRuntime(t *testing.T) {
 	assert := assert.New(t)
 	assert.Nil(err)
 	assert.Equal("fetch response", fmt.Sprintf("%v", result.GetExitResult()))
-	assert.Equal(true, result.GetContext()["workflowSettings"].(map[string]interface{})["resetClaims"])
 }

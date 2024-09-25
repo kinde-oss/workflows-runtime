@@ -3,7 +3,7 @@ package runtime_registry
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
+	"encoding/base32"
 	"fmt"
 	"time"
 )
@@ -19,11 +19,6 @@ type (
 	StartOptions struct {
 		EntryPoint string
 		Arguments  []interface{}
-	}
-
-	runtimeReference struct {
-		Name    string `json:"name"`
-		Version int    `json:"version"`
 	}
 
 	CodeDescriptor struct {
@@ -50,21 +45,35 @@ type (
 	}
 
 	WorkflowDescriptor struct {
-		runtime         runtimeReference
 		ProcessedSource CodeDescriptor `json:"processed_source"`
 		Bindings        Bindings       `json:"bindings"`
 		Limits          RuntimeLimits  `json:"runtime_limits"`
 	}
 
-	Result interface {
+	ExecutionResult interface {
 		GetExitResult() interface{}
 		GetConsoleLog() []interface{}
 		GetConsoleError() []interface{}
 		GetContext() map[string]interface{}
 	}
 
+	IntrospectedExport interface {
+		HasExport() bool
+		Value() interface{}
+		ValueAsMap() map[string]interface{}
+	}
+
+	IntrospectionResult interface {
+		GetExport(string) IntrospectedExport
+	}
+
+	IntrospectionOptions struct {
+		Exports []string
+	}
+
 	Runner interface {
-		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (Result, error)
+		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (ExecutionResult, error)
+		Introspect(ctx context.Context, workflow WorkflowDescriptor, options IntrospectionOptions) (IntrospectionResult, error)
 	}
 )
 
@@ -85,9 +94,8 @@ func ResolveRuntime(name string) (Runner, error) {
 
 // Returns a hash of the workflow descriptor
 func (wd *WorkflowDescriptor) GetHash() string {
-	base := fmt.Sprintf("%v-%v", wd.ProcessedSource.BuildHash, string(wd.ProcessedSource.Source))
 	sha := sha256.New()
-	sha.Write([]byte(base))
-	result := base64.StdEncoding.EncodeToString(sha.Sum(nil))
+	sha.Write([]byte(wd.ProcessedSource.Source))
+	result := base32.StdEncoding.EncodeToString(sha.Sum(nil))
 	return fmt.Sprintf("%v", result)
 }
