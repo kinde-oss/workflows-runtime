@@ -18,8 +18,11 @@ func Test_ProjectBunler(t *testing.T) {
 
 	assert := assert.New(t)
 
-	assert.Nil(discoveryError)
+	if !assert.Nil(discoveryError) {
+		t.FailNow()
+	}
 	assert.Equal("2024-12-09", kindeProject.Configuration.Version)
 	assert.Equal("kindeSrc", kindeProject.Configuration.RootDir)
+	assert.Equal(2, len(kindeProject.Environment.Workflows.Workflows))
 
 }

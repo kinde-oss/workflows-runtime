@@ -48,15 +48,17 @@ type (
 // Discover implements ProjectBundler.
 func (p *projectBundler) Discover() (*KindeProject, error) {
 	result := &KindeProject{}
-	configuration, err := discoverKindeRoot(p.options.StartFolder)
+	err := result.discoverKindeRoot(p.options.StartFolder)
 	if err != nil {
-		return nil, fmt.Errorf("error discoving project root: %w", err)
+		return nil, err
 	}
-	result.Configuration = *configuration
+
+	//result.discoverWorkflows()
+
 	return result, nil
 }
 
-func discoverKindeRoot(startFolder string) (*ProjectConfiguration, error) {
+func (kp *KindeProject) discoverKindeRoot(startFolder string) error {
 
 	currentDirectory, _ := filepath.Abs(startFolder)
 
@@ -68,12 +70,18 @@ func discoverKindeRoot(startFolder string) (*ProjectConfiguration, error) {
 		filePath := filepath.Join(currentDirectory, "kinde.json")
 		configFile, _ := os.Stat(filePath)
 		if configFile != nil {
-			return readProjectConfiguration(filePath)
+			config, error := kp.readProjectConfiguration(filePath)
+			if error != nil {
+				return error
+			}
+			kp.Configuration = *config
+			return nil
+
 		}
 		parentPath := filepath.Join(currentDirectory, "..")
 		currentDirectory, _ = filepath.Abs(parentPath)
-		if currentDirectory == "" {
-			return nil, fmt.Errorf("could not find kinde.json")
+		if currentDirectory == "/" {
+			return fmt.Errorf("could not find kinde.json")
 		}
 	}
 
@@ -85,7 +93,7 @@ func NewProjectBundler(discoveryOptions DiscoveryOptions) ProjectBundler {
 	}
 }
 
-func readProjectConfiguration(configFileInfo string) (*ProjectConfiguration, error) {
+func (*KindeProject) readProjectConfiguration(configFileInfo string) (*ProjectConfiguration, error) {
 	confiHandler, _ := os.Open(configFileInfo)
 	configFile, err := io.ReadAll(confiHandler)
 	if err != nil {
@@ -94,5 +102,8 @@ func readProjectConfiguration(configFileInfo string) (*ProjectConfiguration, err
 	result := &ProjectConfiguration{}
 	json.Unmarshal(configFile, result)
 	result.AbsLocation = path.Dir(configFileInfo)
+	if result.RootDir == "" {
+		result.RootDir = "kindeSrc"
+	}
 	return result, nil
 }
