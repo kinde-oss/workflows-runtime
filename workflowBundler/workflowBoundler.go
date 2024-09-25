@@ -123,7 +123,7 @@ func (br *BundlerResult) discoverSettings(source []byte) WorkflowSettings {
 				MaxExecutionDuration: 30 * time.Second,
 			},
 		},
-		runtimesRegistry.InstrospectionOptions{
+		runtimesRegistry.IntrospectionOptions{
 			Exports: []string{"workflowSettings"},
 		})
 

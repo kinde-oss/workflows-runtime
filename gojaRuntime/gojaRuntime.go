@@ -119,7 +119,7 @@ func newGojaRunner() runtimesRegistry.Runner {
 }
 
 // Introspect implements runtime_registry.Runner.
-func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.InstrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
+func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
 	_, returnErr := setupVM(ctx, vm, e, workflow)
 

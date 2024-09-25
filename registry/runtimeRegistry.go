@@ -67,13 +67,13 @@ type (
 		GetExport(string) IntrospectedExport
 	}
 
-	InstrospectionOptions struct {
+	IntrospectionOptions struct {
 		Exports []string
 	}
 
 	Runner interface {
 		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (ExecutionResult, error)
-		Introspect(ctx context.Context, workflow WorkflowDescriptor, options InstrospectionOptions) (IntrospectionResult, error)
+		Introspect(ctx context.Context, workflow WorkflowDescriptor, options IntrospectionOptions) (IntrospectionResult, error)
 	}
 )
 
