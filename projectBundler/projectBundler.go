@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/rs/zerolog/log"
 )
 
 type (
@@ -45,6 +47,24 @@ type (
 	}
 )
 
+func (kw *KindeWorkflows) discover(absLocation string) {
+	//environment/workflows
+	workflowsPath := filepath.Join(absLocation, "environment", "workflows")
+	//check if the folder exists
+	_, err := os.Stat(workflowsPath)
+	if err != nil {
+		log.Warn().Msgf("could not find workflows folder: %s", workflowsPath)
+		return
+	}
+	workflows, _ := os.ReadDir(workflowsPath)
+	for _, workflow := range workflows {
+		if workflow.IsDir() {
+			workflowsPath := filepath.Join(workflowsPath, workflow.Name())
+			kw.Workflows = append(kw.Workflows, KindeWorkflow{WorkflowRootDirectory: workflowsPath})
+		}
+	}
+}
+
 // Discover implements ProjectBundler.
 func (p *projectBundler) Discover() (*KindeProject, error) {
 	result := &KindeProject{}
@@ -53,7 +73,7 @@ func (p *projectBundler) Discover() (*KindeProject, error) {
 		return nil, err
 	}
 
-	//result.discoverWorkflows()
+	result.Environment.Workflows.discover(filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
 
 	return result, nil
 }
