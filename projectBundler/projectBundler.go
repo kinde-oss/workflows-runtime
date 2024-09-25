@@ -7,7 +7,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
+	bundler "github.com/kinde-oss/workflows-runtime/workflowBundler"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,7 +21,9 @@ type (
 	}
 
 	KindeWorkflow struct {
-		WorkflowRootDirectory string `json:"workflow_root_directory"`
+		WorkflowRootDirectory string                `json:"workflow_root_directory"`
+		EntryPoints           []string              `json:"entry_points"`
+		Bundle                bundler.BundlerResult `json:"bundle"`
 	}
 	KindeWorkflows struct {
 		Workflows []KindeWorkflow `json:"workflows"`
@@ -60,7 +64,21 @@ func (kw *KindeWorkflows) discover(absLocation string) {
 	for _, workflow := range workflows {
 		if workflow.IsDir() {
 			workflowsPath := filepath.Join(workflowsPath, workflow.Name())
-			kw.Workflows = append(kw.Workflows, KindeWorkflow{WorkflowRootDirectory: workflowsPath})
+
+			files, _ := os.ReadDir(workflowsPath)
+			for _, file := range files {
+				fileName := strings.ToLower(file.Name())
+				if strings.HasSuffix(fileName, "workflow.ts") || strings.HasSuffix(fileName, "workflow.js") {
+					discoveredWorkflow := KindeWorkflow{
+						WorkflowRootDirectory: workflowsPath,
+						EntryPoints:           []string{file.Name()},
+					}
+					discoveredWorkflow.bundleAndIntrospect()
+					kw.Workflows = append(kw.Workflows, discoveredWorkflow)
+
+				}
+			}
+
 		}
 	}
 }
@@ -126,4 +144,14 @@ func (*KindeProject) readProjectConfiguration(configFileInfo string) (*ProjectCo
 		result.RootDir = "kindeSrc"
 	}
 	return result, nil
+}
+
+func (kw *KindeWorkflow) bundleAndIntrospect() {
+	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions{
+		WorkingFolder: kw.WorkflowRootDirectory,
+		EntryPoints:   kw.EntryPoints,
+	})
+	bundlerResult := workflowBuilder.Bundle()
+	kw.Bundle = bundlerResult
+
 }

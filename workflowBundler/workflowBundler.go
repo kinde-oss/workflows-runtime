@@ -40,7 +40,7 @@ type (
 	}
 )
 
-func newWorkflowBundler(options BundlerOptions) WorkflowBundler {
+func NewWorkflowBundler(options BundlerOptions) WorkflowBundler {
 	return &builder{
 		bundleOptions: options,
 	}

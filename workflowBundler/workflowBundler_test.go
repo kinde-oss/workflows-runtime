@@ -11,9 +11,9 @@ func Test_WorkflowBundler(t *testing.T) {
 
 	workflowPath, _ := filepath.Abs("../testData/kindeSrc/environment/workflows/evTest")
 
-	workflowBuilder := newWorkflowBundler(BundlerOptions{
+	workflowBuilder := NewWorkflowBundler(BundlerOptions{
 		WorkingFolder: workflowPath,
-		EntryPoints:   []string{"workflow.ts"},
+		EntryPoints:   []string{"tokensWorkflow.ts"},
 	})
 	bundlerResult := workflowBuilder.Bundle()
 
