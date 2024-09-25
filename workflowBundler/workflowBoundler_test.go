@@ -22,4 +22,5 @@ func Test_WorkflowBundler(t *testing.T) {
 	assert.NotEmpty(bundlerResult.Bundle.Source)
 	assert.Equal("tokenGen", bundlerResult.Bundle.Settings.ID)
 	assert.Equal("onTokenGeneration", bundlerResult.Bundle.Settings.Other["trigger"])
+	assert.NotEmpty(bundlerResult.Bundle.BundleHash)
 }

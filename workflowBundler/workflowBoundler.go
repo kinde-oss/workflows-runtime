@@ -16,9 +16,9 @@ type (
 		Other map[string]interface{} `json:"other"`
 	}
 	BundledContent struct {
-		Source   []byte           `json:"source"`
-		Hash     string           `json:"hash"`
-		Settings WorkflowSettings `json:"settings"`
+		Source     []byte           `json:"source"`
+		BundleHash string           `json:"hash"`
+		Settings   WorkflowSettings `json:"settings"`
 	}
 
 	BundlerResult struct {
@@ -82,9 +82,9 @@ func (b *builder) Bundle() BundlerResult {
 
 		file := tr.OutputFiles[0]
 		result.Bundle = BundledContent{
-			Source:   file.Contents,
-			Hash:     file.Hash,
-			Settings: result.discoverSettings(file.Contents),
+			Source:     file.Contents,
+			BundleHash: file.Hash,
+			Settings:   result.discoverSettings(file.Contents),
 		}
 	}
 
