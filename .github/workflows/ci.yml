@@ -19,15 +19,12 @@ jobs:
         go-version: '1.22'
 
     - name: Test
-      run: go test -v ./...
+      run: go test -v -coverprofile=coverage.txt ./...
 
     - id: govulncheck
       uses: golang/govulncheck-action@v1
       with:
          go-package: ./...
-
-    - name: Run tests
-        run: go test -coverprofile=coverage.txt
 
     - name: Upload results to Codecov
       uses: codecov/codecov-action@v4
