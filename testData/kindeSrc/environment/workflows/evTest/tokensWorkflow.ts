@@ -3,7 +3,10 @@ import {hello} from "./hello"
 export const workflowSettings = {
     id: 'tokenGen',
     trigger: 'onTokenGeneration',
-    resetClaims: true
+    resetClaims: true,
+    kindeAPIs: {
+        fetch: {}
+    }
 };
 
 export default async function handle (event: any) {
