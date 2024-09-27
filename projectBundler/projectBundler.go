@@ -25,12 +25,9 @@ type (
 		EntryPoints           []string              `json:"entry_points"`
 		Bundle                bundler.BundlerResult `json:"bundle"`
 	}
-	KindeWorkflows struct {
-		Workflows []KindeWorkflow `json:"workflows"`
-	}
 
 	KindeEnvironment struct {
-		Workflows KindeWorkflows `json:"workflows"`
+		Workflows []KindeWorkflow `json:"workflows"`
 	}
 
 	KindeProject struct {
@@ -51,7 +48,7 @@ type (
 	}
 )
 
-func (kw *KindeWorkflows) discover(absLocation string) {
+func (kw *KindeEnvironment) discover(absLocation string) {
 	//environment/workflows
 	workflowsPath := filepath.Join(absLocation, "environment", "workflows")
 	//check if the folder exists
@@ -91,7 +88,7 @@ func (p *projectBundler) Discover() (*KindeProject, error) {
 		return nil, err
 	}
 
-	result.Environment.Workflows.discover(filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
+	result.Environment.discover(filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
 
 	return result, nil
 }

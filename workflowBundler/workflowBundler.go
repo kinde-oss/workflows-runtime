@@ -22,8 +22,8 @@ type (
 	}
 
 	BundlerResult struct {
-		Bundle BundledContent `json:"bundle"`
-		Errors []error        `json:"errors"`
+		Content BundledContent `json:"bundle"`
+		Errors  []error        `json:"errors"`
 	}
 
 	BundlerOptions struct {
@@ -81,14 +81,14 @@ func (b *builder) Bundle() BundlerResult {
 		}
 
 		file := tr.OutputFiles[0]
-		result.Bundle = BundledContent{
+		result.Content = BundledContent{
 			Source:     file.Contents,
 			BundleHash: file.Hash,
 			Settings:   result.discoverSettings(file.Contents),
 		}
 	}
 
-	if result.Bundle.Settings.ID == "" {
+	if result.Content.Settings.ID == "" {
 		result.addError(errors.New("workflow id not found, please export workflowSettings.id"))
 	}
 
@@ -96,7 +96,7 @@ func (b *builder) Bundle() BundlerResult {
 }
 
 func (br *BundlerResult) HasOutput() bool {
-	return len(br.Bundle.Source) > 0
+	return len(br.Content.Source) > 0
 }
 
 func (br *BundlerResult) addError(err error) {
@@ -107,7 +107,7 @@ func (br *BundlerResult) discoverSettings(source []byte) WorkflowSettings {
 	goja, _ := runtimesRegistry.ResolveRuntime("goja")
 	introspectResult, _ := goja.Introspect(context.Background(),
 		runtimesRegistry.WorkflowDescriptor{
-			ProcessedSource: runtimesRegistry.CodeDescriptor{
+			ProcessedSource: runtimesRegistry.SourceDescriptor{
 				Source:     source,
 				SourceType: runtimesRegistry.Source_ContentType_Text,
 			},

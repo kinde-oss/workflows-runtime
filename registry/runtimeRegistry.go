@@ -21,7 +21,7 @@ type (
 		Arguments  []interface{}
 	}
 
-	CodeDescriptor struct {
+	SourceDescriptor struct {
 		Source     []byte            `json:"source"`
 		SourceType SourceContentType `json:"source_type"`
 		BuildHash  string            `json:"build_hash"`
@@ -45,9 +45,9 @@ type (
 	}
 
 	WorkflowDescriptor struct {
-		ProcessedSource CodeDescriptor `json:"processed_source"`
-		Bindings        Bindings       `json:"bindings"`
-		Limits          RuntimeLimits  `json:"runtime_limits"`
+		ProcessedSource SourceDescriptor `json:"processed_source"`
+		Bindings        Bindings         `json:"bindings"`
+		Limits          RuntimeLimits    `json:"runtime_limits"`
 	}
 
 	ExecutionResult interface {
