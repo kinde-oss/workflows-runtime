@@ -89,8 +89,26 @@ func (a *actionResult) GetConsoleLog() []interface{} {
 }
 
 // GetContext implements runtime_registry.Result.
-func (a *actionResult) GetContext() map[string]interface{} {
-	return a.Context.data
+func (a *actionResult) GetContext() runtimesRegistry.RuntimeContext {
+	return a.Context
+}
+
+// GetValue implements runtimesRegistry.RuntimeContext.
+func (j jsContext) GetValues() map[string]interface{} {
+	return j.data
+}
+
+// GetValueAsMap implements runtime_registry.RuntimeContext.
+func (j jsContext) GetValueAsMap(key string) (map[string]interface{}, error) {
+	if value, ok := j.data[key]; ok {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			return v, nil
+		default:
+			return nil, fmt.Errorf("value is not a map")
+		}
+	}
+	return nil, fmt.Errorf("key not found")
 }
 
 func (a *actionResult) GetExitResult() interface{} {

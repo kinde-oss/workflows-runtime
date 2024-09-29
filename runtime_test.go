@@ -34,7 +34,7 @@ func Test_GojaRuntime(t *testing.T) {
 		return nil, nil
 	})
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 2; i++ {
 
 		result, err := runtime.Execute(context.Background(), registry.WorkflowDescriptor{
 			Limits: registry.RuntimeLimits{
@@ -68,5 +68,9 @@ func Test_GojaRuntime(t *testing.T) {
 		assert := assert.New(t)
 		assert.Nil(err)
 		assert.Equal("fetch response", fmt.Sprintf("%v", result.GetExitResult()))
+
+		idTokenMap, err := result.GetContext().GetValueAsMap("idToken")
+		assert.Nil(err)
+		assert.Equal("bbb", idTokenMap["aaa"])
 	}
 }

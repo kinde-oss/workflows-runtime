@@ -49,11 +49,16 @@ type (
 		Limits            RuntimeLimits    `json:"runtime_limits"`
 	}
 
+	RuntimeContext interface {
+		GetValues() map[string]interface{}
+		GetValueAsMap(key string) (map[string]interface{}, error)
+	}
+
 	ExecutionResult interface {
 		GetExitResult() interface{}
 		GetConsoleLog() []interface{}
 		GetConsoleError() []interface{}
-		GetContext() map[string]interface{}
+		GetContext() RuntimeContext
 	}
 
 	IntrospectedExport interface {
