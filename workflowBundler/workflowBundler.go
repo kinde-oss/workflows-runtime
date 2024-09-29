@@ -111,13 +111,8 @@ func (br *BundlerResult) discoverSettings(source []byte) WorkflowSettings {
 				Source:     source,
 				SourceType: runtimesRegistry.Source_ContentType_Text,
 			},
-			Bindings: runtimesRegistry.Bindings{
-				GlobalModules: map[string]runtimesRegistry.ModuleBinding{
-					"console": {},
-					"url":     {},
-					"module":  {},
-					"kinde":   {},
-				},
+			RequestedBindings: runtimesRegistry.Bindings{
+				Global: map[string]runtimesRegistry.ModuleBinding{},
 			},
 			Limits: runtimesRegistry.RuntimeLimits{
 				MaxExecutionDuration: 30 * time.Second,

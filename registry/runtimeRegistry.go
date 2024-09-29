@@ -32,12 +32,11 @@ type (
 	}
 	ModuleBinding struct {
 		Configuration ModuleBindingConfiguration `json:"configuration"`
-		ContextKey    string                     `json:"context_key"`
 	}
 
 	Bindings struct {
-		GlobalModules map[string]ModuleBinding `json:"global_modules"`
-		KindeAPIs     map[string]ModuleBinding `json:"kinde_apis"`
+		Global map[string]ModuleBinding `json:"global_modules"`
+		Native map[string]ModuleBinding `json:"native_modules"`
 	}
 
 	RuntimeLimits struct {
@@ -45,9 +44,9 @@ type (
 	}
 
 	WorkflowDescriptor struct {
-		ProcessedSource SourceDescriptor `json:"processed_source"`
-		Bindings        Bindings         `json:"bindings"`
-		Limits          RuntimeLimits    `json:"runtime_limits"`
+		ProcessedSource   SourceDescriptor `json:"processed_source"`
+		RequestedBindings Bindings         `json:"bindings"`
+		Limits            RuntimeLimits    `json:"runtime_limits"`
 	}
 
 	ExecutionResult interface {
