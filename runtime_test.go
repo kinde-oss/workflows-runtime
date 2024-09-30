@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	goja_runtime "github.com/kinde-oss/workflows-runtime/gojaRuntime"
-	project_bundler "github.com/kinde-oss/workflows-runtime/projectBundler"
+	gojaRuntime "github.com/kinde-oss/workflows-runtime/gojaRuntime"
+	projectBundler "github.com/kinde-oss/workflows-runtime/projectBundler"
 	registry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
@@ -60,7 +60,7 @@ func Test_GojaPrecompiledRuntime(t *testing.T) {
 func Test_ProjectBunlerE2E(t *testing.T) {
 	somePathInsideProject, _ := filepath.Abs("./testData/kindeSrc/environment/workflows") //starting in a middle of nowhere, so we need to go up to the root of the project
 
-	projectBundler := project_bundler.NewProjectBundler(project_bundler.DiscoveryOptions{
+	projectBundler := projectBundler.NewProjectBundler(projectBundler.DiscoveryOptions{
 		StartFolder: somePathInsideProject,
 	})
 
@@ -83,7 +83,7 @@ func Test_ProjectBunlerE2E(t *testing.T) {
 
 }
 
-func testExecution(workflow project_bundler.KindeWorkflow, assert *assert.Assertions) func(t *testing.T) {
+func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Assertions) func(t *testing.T) {
 	return func(t *testing.T) {
 		runner := getGojaRunner()
 		result, err := runner.Execute(context.Background(), registry.WorkflowDescriptor{
@@ -117,12 +117,12 @@ func testExecution(workflow project_bundler.KindeWorkflow, assert *assert.Assert
 func getGojaRunner() registry.Runner {
 	runtime, _ := GetRuntime("goja")
 
-	kindeAPI := runtime.(*goja_runtime.GojaRunnerV1).RegisterNativeAPI("kinde")
-	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI := runtime.(*gojaRuntime.GojaRunnerV1).RegisterNativeAPI("kinde")
+	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.ModuleBinding, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		return "fetch response", nil
 	})
 
-	kindeAPI.RegisterNativeAPI("idToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeAPI("idToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
 		}
@@ -134,7 +134,7 @@ func getGojaRunner() registry.Runner {
 		return nil, nil
 	})
 
-	kindeAPI.RegisterNativeAPI("accessToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeAPI("accessToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
 		}
