@@ -50,6 +50,8 @@ func Test_GojaPrecompiledRuntime(t *testing.T) {
 		idTokenMap, err := result.GetContext().GetValueAsMap("idToken")
 		assert.Nil(err)
 		assert.Equal("bbb", idTokenMap["aaa"])
+		assert.Greater(result.ExecutionMetadata().ExecutionDuration.Nanoseconds(), int64(1))
+		assert.False(result.ExecutionMetadata().StartedAt.IsZero())
 	}
 }
 

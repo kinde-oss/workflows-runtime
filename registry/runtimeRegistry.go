@@ -32,11 +32,6 @@ type (
 		Settings map[string]interface{} `json:"settings"`
 	}
 
-	// Bindings struct {
-	// 	Global map[string]ModuleBinding `json:"global"`
-	// 	Native map[string]ModuleBinding `json:"native"`
-	// }
-
 	RuntimeLimits struct {
 		MaxExecutionDuration time.Duration `json:"max_execution_duration"`
 	}
@@ -52,7 +47,12 @@ type (
 		GetValueAsMap(key string) (map[string]interface{}, error)
 	}
 
+	ExecutionMetadata struct {
+		StartedAt         time.Time     `json:"started_at"`
+		ExecutionDuration time.Duration `json:"execution_duration"`
+	}
 	ExecutionResult interface {
+		ExecutionMetadata() ExecutionMetadata
 		GetExitResult() interface{}
 		GetConsoleLog() []interface{}
 		GetConsoleError() []interface{}
