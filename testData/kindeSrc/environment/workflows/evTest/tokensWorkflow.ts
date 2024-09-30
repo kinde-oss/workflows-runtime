@@ -3,9 +3,15 @@ import {hello} from "./hello"
 export const workflowSettings = {
     id: 'tokenGen',
     trigger: 'onTokenGeneration',
-    resetClaims: true,
-    kindeAPIs: {
-        fetch: {}
+    bindings:{
+        "console": {},
+        "kinde.fetch": {},
+        "kinde.idToken": {
+            resetClaims: true
+        },
+        "kinde.accessToken": {
+            resetClaims: true
+        }
     }
 };
 
@@ -16,5 +22,4 @@ export default async function handle (event: any) {
         await kinde.fetch("http://google.com");
         console.error('error log');
         return 'testing return';
-
 }

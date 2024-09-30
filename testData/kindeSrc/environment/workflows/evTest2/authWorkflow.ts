@@ -1,10 +1,20 @@
 import {hello} from "./hello"
 
 export const workflowSettings = {
-    id: 'tokenGen2',
-    trigger: 'onTokenGeneration2',
-    resetClaims: true
+    id: 'tokenGen',
+    trigger: 'onTokenGeneration',
+    bindings:{
+        "console": {},
+        "kinde.fetch": {},
+        "kinde.idToken": {
+            resetClaims: true
+        },
+        "kinde.accessToken": {
+            resetClaims: true
+        }
+    }
 };
+
 
 export default {
     async handle(event: any) {

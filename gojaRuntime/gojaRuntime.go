@@ -2,6 +2,7 @@ package goja_runtime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -13,24 +14,47 @@ import (
 )
 
 type (
-	gojaRunnerV1 struct {
-		Cache *gojaCache
+	nativeModules struct {
+		registered map[string]*NativeModule
+	}
+
+	GojaRunnerV1 struct {
+		cache         *gojaCache
+		nativeModules nativeModules
 	}
 
 	actionResult struct {
-		ConsoleLog   []interface{}          `json:"console_log"`
-		ConsoleError []interface{}          `json:"console_error"`
-		Context      map[string]interface{} `json:"context"`
-		ExitResult   interface{}            `json:"exit_result"`
+		ConsoleLog   []interface{} `json:"console_log"`
+		ConsoleError []interface{} `json:"console_error"`
+		Context      *jsContext    `json:"context"`
+		ExitResult   interface{}   `json:"exit_result"`
 	}
 	introspectedExport struct {
-		value interface{}
+		value    interface{}
+		bindings map[string]runtimesRegistry.BindingSettings
 	}
 
 	introspectionResult struct {
 		exports map[string]introspectedExport
 	}
+
+	JsContext interface {
+		SetValue(key string, value interface{})
+	}
+	jsContext struct {
+		data map[string]interface{}
+	}
 )
+
+// BindingsFrom implements runtime_registry.IntrospectedExport.
+func (i introspectedExport) BindingsFrom(exportName string) map[string]runtimesRegistry.BindingSettings {
+	return i.bindings
+}
+
+// SetValue implements JsContext.
+func (j jsContext) SetValue(key string, value interface{}) {
+	j.data[key] = value
+}
 
 // HasExport implements runtime_registry.IntrospectedExport.
 func (i introspectedExport) HasExport() bool {
@@ -56,8 +80,27 @@ func (i introspectionResult) GetExport(name string) runtimesRegistry.Introspecte
 }
 
 func (i introspectionResult) recordExport(name string, value interface{}) {
+
+	mapBindings := func(key string, value interface{}) map[string]runtimesRegistry.BindingSettings {
+		if value == nil {
+			return nil
+		}
+
+		bindings := value.(map[string]interface{})[key]
+
+		marshalled, _ := json.Marshal(bindings)
+		result := map[string]runtimesRegistry.BindingSettings{}
+		err := json.Unmarshal(marshalled, &result)
+		if err != nil {
+			return nil
+		}
+		return result
+
+	}
+
 	i.exports[name] = introspectedExport{
-		value: value,
+		value:    value,
+		bindings: mapBindings("bindings", value),
 	}
 }
 
@@ -72,8 +115,26 @@ func (a *actionResult) GetConsoleLog() []interface{} {
 }
 
 // GetContext implements runtime_registry.Result.
-func (a *actionResult) GetContext() map[string]interface{} {
+func (a *actionResult) GetContext() runtimesRegistry.RuntimeContext {
 	return a.Context
+}
+
+// GetValue implements runtimesRegistry.RuntimeContext.
+func (j jsContext) GetValues() map[string]interface{} {
+	return j.data
+}
+
+// GetValueAsMap implements runtime_registry.RuntimeContext.
+func (j *jsContext) GetValueAsMap(key string) (map[string]interface{}, error) {
+	if value, ok := j.data[key]; ok {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			return v, nil
+		default:
+			return nil, fmt.Errorf("value is not a map")
+		}
+	}
+	return nil, fmt.Errorf("key not found")
 }
 
 func (a *actionResult) GetExitResult() interface{} {
@@ -82,46 +143,120 @@ func (a *actionResult) GetExitResult() interface{} {
 
 var registry = new(require.Registry)
 
-var availableModules = map[string]func(e *gojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, result *actionResult, binding runtimesRegistry.ModuleBinding){
-	"console": func(runner *gojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, result *actionResult, binding runtimesRegistry.ModuleBinding) {
+var builtInModules = map[string]func(e *GojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, result *actionResult, binding runtimesRegistry.BindingSettings){
+	"console": func(runner *GojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, result *actionResult, binding runtimesRegistry.BindingSettings) {
 		vm.Set("console", vm.NewObject())
 		consoleMountingPoint := vm.Get("console").(*goja.Object)
 		runner.consoleEmulation(vm, consoleMountingPoint, result, binding)
 	},
-	"url": func(e *gojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, _ *actionResult, _ runtimesRegistry.ModuleBinding) {
+	"url": func(e *GojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, _ *actionResult, _ runtimesRegistry.BindingSettings) {
 		vm.Set("url", require.Require(vm, "url"))
 	},
-	"module": func(e *gojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, _ *actionResult, _ runtimesRegistry.ModuleBinding) {
+	"module": func(e *GojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, _ *actionResult, _ runtimesRegistry.BindingSettings) {
 		vm.Set("module", vm.NewObject())
 	},
 }
 
-var kindeAPIs = map[string]func(runtimesRegistry.ModuleBinding, ...interface{}) (interface{}, error){}
-
-func RegisterKindeAPI(apiName string, api func(runtimesRegistry.ModuleBinding, ...interface{}) (interface{}, error)) {
-	kindeAPIs[apiName] = api
-}
-
 func init() {
 	runtimesRegistry.RegisterRuntime("goja", newGojaRunner)
-
 	registry.RegisterNativeModule("url", urlModule.Require)
-
 }
 
 func newGojaRunner() runtimesRegistry.Runner {
-	runner := gojaRunnerV1{
-		Cache: &gojaCache{
+	runner := GojaRunnerV1{
+		cache: &gojaCache{
 			cache: map[string]*goja.Program{},
+		},
+		nativeModules: nativeModules{
+			registered: map[string]*NativeModule{},
 		},
 	}
 	return &runner
 }
 
+func (nm *NativeModule) setupModuleForVM(vm *goja.Runtime, actionResult *actionResult, parent *goja.Object, requestedName string, binding runtimesRegistry.BindingSettings) {
+	for _, name := range strings.Split(requestedName, ".")[:1] {
+		if function, ok := nm.functions[name]; ok {
+			wrappedFunc := func(binding runtimesRegistry.BindingSettings, jsContext jsContext) func(args ...interface{}) (interface{}, error) {
+				return func(args ...interface{}) (interface{}, error) {
+					return function(binding, jsContext, args...)
+				}
+			}
+			parent.Set(name, vm.ToValue(wrappedFunc(binding, *actionResult.Context)))
+		}
+
+		if name == "" {
+			for fname, function := range nm.functions {
+
+				wrappedFunc := func(binding runtimesRegistry.BindingSettings, jsContext jsContext) func(args ...interface{}) (interface{}, error) {
+					return func(args ...interface{}) (interface{}, error) {
+						return function(binding, jsContext, args...)
+					}
+				}
+
+				parent.Set(fname, vm.ToValue(wrappedFunc(binding, *actionResult.Context)))
+			}
+			return
+		}
+
+		if module, ok := nm.modules[name]; ok {
+			registeredModule := vm.NewObject()
+			parent.Set(name, registeredModule)
+			module.setupModuleForVM(vm, actionResult, registeredModule, strings.Join(strings.Split(requestedName, ".")[1:], "."), binding)
+		}
+	}
+}
+
+func (nm *nativeModules) setupModuleForVM(vm *goja.Runtime, actionResult *actionResult, requestedName string, binding runtimesRegistry.BindingSettings) {
+
+	for _, name := range strings.Split(requestedName, ".")[:1] {
+		if module, ok := nm.registered[name]; ok {
+			registeredModule := vm.Get(name)
+			if registeredModule == nil {
+				registeredModule = vm.NewObject()
+				vm.Set(name, registeredModule)
+			}
+			module.setupModuleForVM(vm, actionResult, registeredModule.(*goja.Object), strings.Join(strings.Split(requestedName, ".")[1:], "."), binding)
+		}
+	}
+
+}
+
+type NativeModule struct {
+	functions map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)
+	modules   map[string]*NativeModule
+	name      string
+}
+
+func (runner GojaRunnerV1) RegisterNativeAPI(name string) *NativeModule {
+	result := &NativeModule{
+		functions: map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
+		modules:   map[string]*NativeModule{},
+		name:      name,
+	}
+	runner.nativeModules.registered[name] = result
+	return result
+}
+
+func (module *NativeModule) RegisterNativeFunction(name string, fn func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)) {
+
+	module.functions[name] = fn
+}
+
+func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
+	result := &NativeModule{
+		functions: map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
+		modules:   map[string]*NativeModule{},
+		name:      name,
+	}
+	module.modules[name] = result
+	return result
+}
+
 // Introspect implements runtime_registry.Runner.
-func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
+func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
-	_, returnErr := setupVM(ctx, vm, e, workflow)
+	_, returnErr := e.setupVM(ctx, vm, workflow)
 
 	if returnErr != nil {
 		return nil, returnErr
@@ -146,10 +281,10 @@ func (e *gojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry
 	return introspectionResult, nil
 }
 
-func (e *gojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, startOptions runtimesRegistry.StartOptions) (runtimesRegistry.ExecutionResult, error) {
+func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, startOptions runtimesRegistry.StartOptions) (runtimesRegistry.ExecutionResult, error) {
 
 	vm := goja.New()
-	executionResult, returnErr := setupVM(ctx, vm, e, workflow)
+	executionResult, returnErr := e.setupVM(ctx, vm, workflow)
 
 	if returnErr != nil {
 		return executionResult, returnErr
@@ -163,12 +298,16 @@ func (e *gojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 		return nil, fmt.Errorf("no default export")
 	}
 
-	targetVmFunction := defaultExport.ToObject(vm).Get(startOptions.EntryPoint)
-	if targetVmFunction == nil {
-		return nil, fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
-	}
 	var callableFunction goja.Callable
-	vm.ExportTo(targetVmFunction, &callableFunction)
+	if callabla, isFunction := goja.AssertFunction(defaultExport); isFunction {
+		callableFunction = callabla
+	} else {
+		targetVmFunction := defaultExport.ToObject(vm).Get(startOptions.EntryPoint)
+		if targetVmFunction == nil {
+			return nil, fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
+		}
+		vm.ExportTo(targetVmFunction, &callableFunction)
+	}
 
 	functionParams := []goja.Value{}
 	for _, arg := range startOptions.Arguments {
@@ -209,7 +348,7 @@ func (e *gojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	return executionResult, nil
 }
 
-func setupVM(ctx context.Context, vm *goja.Runtime, runner *gojaRunnerV1, workflow runtimesRegistry.WorkflowDescriptor) (*actionResult, error) {
+func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workflow runtimesRegistry.WorkflowDescriptor) (*actionResult, error) {
 	registry.Enable(vm)
 
 	runner.maxExecutionTimeout(ctx, vm, workflow.Limits.MaxExecutionDuration)
@@ -218,25 +357,27 @@ func setupVM(ctx context.Context, vm *goja.Runtime, runner *gojaRunnerV1, workfl
 	executionResult := &actionResult{
 		ConsoleLog:   []interface{}{},
 		ConsoleError: []interface{}{},
-		Context:      map[string]interface{}{},
+		Context: &jsContext{
+			data: map[string]interface{}{},
+		},
 	}
 
-	for name, binding := range workflow.Bindings.GlobalModules {
-		if module, ok := availableModules[name]; ok {
+	for name, binding := range workflow.RequestedBindings {
+		if module, ok := builtInModules[name]; ok {
 			module(runner, vm, vm.NewObject(), executionResult, binding)
 		}
 	}
 
-	vm.Set("kinde", vm.NewObject())
-	for name, binding := range workflow.Bindings.KindeAPIs {
-		kindeMountPoint := vm.Get("kinde").(*goja.Object)
-		if apiFunc, ok := kindeAPIs[name]; ok {
-			kindeMountPoint.Set(name, runner.callRegisteredAPI(binding, apiFunc))
-		}
+	for requestedName, requestedBinding := range workflow.RequestedBindings {
+		runner.nativeModules.setupModuleForVM(vm, executionResult, requestedName, requestedBinding)
+	}
+
+	if vm.Get("module") == nil { //esModules prerequisite
+		vm.Set("module", vm.NewObject())
 	}
 
 	workflowHash := workflow.GetHash()
-	program, err := runner.Cache.cacheProgram(workflowHash, func() (*goja.Program, error) {
+	program, err := runner.cache.cacheProgram(workflowHash, func() (*goja.Program, error) {
 		ast, err := goja.Parse("main", string(workflow.ProcessedSource.Source))
 
 		if err != nil {
@@ -264,7 +405,7 @@ func setupVM(ctx context.Context, vm *goja.Runtime, runner *gojaRunnerV1, workfl
 	return executionResult, nil
 }
 
-func (*gojaRunnerV1) maxExecutionTimeout(ctx context.Context, vm *goja.Runtime, maxExecutionDuration time.Duration) {
+func (*GojaRunnerV1) maxExecutionTimeout(ctx context.Context, vm *goja.Runtime, maxExecutionDuration time.Duration) {
 	go func() {
 		timer := time.NewTimer(maxExecutionDuration)
 		select {
@@ -279,7 +420,7 @@ func (*gojaRunnerV1) maxExecutionTimeout(ctx context.Context, vm *goja.Runtime, 
 	}()
 }
 
-func (*gojaRunnerV1) consoleEmulation(_ *goja.Runtime, mountingPoint *goja.Object, result *actionResult, _ runtimesRegistry.ModuleBinding) {
+func (*GojaRunnerV1) consoleEmulation(_ *goja.Runtime, mountingPoint *goja.Object, result *actionResult, _ runtimesRegistry.BindingSettings) {
 
 	infoFunc := func(arguments ...interface{}) (interface{}, error) {
 		result.ConsoleLog = append(result.ConsoleLog, arguments)
@@ -296,13 +437,4 @@ func (*gojaRunnerV1) consoleEmulation(_ *goja.Runtime, mountingPoint *goja.Objec
 	mountingPoint.Set("debug", infoFunc)
 	mountingPoint.Set("warn", errorFunc)
 	mountingPoint.Set("error", errorFunc)
-}
-
-func (*gojaRunnerV1) callRegisteredAPI(binding runtimesRegistry.ModuleBinding, registeredFunc func(runtimesRegistry.ModuleBinding, ...interface{}) (interface{}, error)) func(...interface{}) (interface{}, error) {
-
-	wrapped := func(args ...interface{}) (interface{}, error) {
-		result, err := registeredFunc(binding, args...)
-		return result, err
-	}
-	return wrapped
 }

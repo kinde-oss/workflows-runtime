@@ -19,8 +19,8 @@ func Test_WorkflowBundler(t *testing.T) {
 
 	assert := assert.New(t)
 	assert.Nil(bundlerResult.Errors, "errors were not expected")
-	assert.NotEmpty(bundlerResult.Bundle.Source)
-	assert.Equal("tokenGen", bundlerResult.Bundle.Settings.ID)
-	assert.Equal("onTokenGeneration", bundlerResult.Bundle.Settings.Other["trigger"])
-	assert.NotEmpty(bundlerResult.Bundle.BundleHash)
+	assert.NotEmpty(bundlerResult.Content.Source)
+	assert.Equal("tokenGen", bundlerResult.Content.Settings.ID)
+	assert.Equal("onTokenGeneration", bundlerResult.Content.Settings.Other["trigger"])
+	assert.NotEmpty(bundlerResult.Content.BundleHash)
 }

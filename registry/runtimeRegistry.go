@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base32"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -21,46 +22,48 @@ type (
 		Arguments  []interface{}
 	}
 
-	CodeDescriptor struct {
+	SourceDescriptor struct {
 		Source     []byte            `json:"source"`
 		SourceType SourceContentType `json:"source_type"`
 		BuildHash  string            `json:"build_hash"`
 	}
 
-	ModuleBindingConfiguration struct {
-		Settings map[string]interface{} `json:"configuration"`
-	}
-	ModuleBinding struct {
-		Configuration ModuleBindingConfiguration `json:"configuration"`
-		ContextKey    string                     `json:"context_key"`
+	BindingSettings struct {
+		Settings map[string]interface{} `json:"settings"`
 	}
 
-	Bindings struct {
-		GlobalModules map[string]ModuleBinding `json:"global_modules"`
-		KindeAPIs     map[string]ModuleBinding `json:"kinde_apis"`
-	}
+	// Bindings struct {
+	// 	Global map[string]ModuleBinding `json:"global"`
+	// 	Native map[string]ModuleBinding `json:"native"`
+	// }
 
 	RuntimeLimits struct {
 		MaxExecutionDuration time.Duration `json:"max_execution_duration"`
 	}
 
 	WorkflowDescriptor struct {
-		ProcessedSource CodeDescriptor `json:"processed_source"`
-		Bindings        Bindings       `json:"bindings"`
-		Limits          RuntimeLimits  `json:"runtime_limits"`
+		ProcessedSource   SourceDescriptor           `json:"processed_source"`
+		RequestedBindings map[string]BindingSettings `json:"bindings"`
+		Limits            RuntimeLimits              `json:"runtime_limits"`
+	}
+
+	RuntimeContext interface {
+		GetValues() map[string]interface{}
+		GetValueAsMap(key string) (map[string]interface{}, error)
 	}
 
 	ExecutionResult interface {
 		GetExitResult() interface{}
 		GetConsoleLog() []interface{}
 		GetConsoleError() []interface{}
-		GetContext() map[string]interface{}
+		GetContext() RuntimeContext
 	}
 
 	IntrospectedExport interface {
 		HasExport() bool
 		Value() interface{}
 		ValueAsMap() map[string]interface{}
+		BindingsFrom(exportName string) map[string]BindingSettings
 	}
 
 	IntrospectionResult interface {
@@ -76,6 +79,13 @@ type (
 		Introspect(ctx context.Context, workflow WorkflowDescriptor, options IntrospectionOptions) (IntrospectionResult, error)
 	}
 )
+
+func (settings *BindingSettings) UnmarshalJSON(data []byte) error {
+	jsonMap := map[string]interface{}{}
+	err := json.Unmarshal(data, &jsonMap)
+	settings.Settings = jsonMap
+	return err
+}
 
 var runtimes map[string]func() Runner = map[string]func() Runner{}
 

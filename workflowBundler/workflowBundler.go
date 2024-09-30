@@ -12,8 +12,9 @@ import (
 
 type (
 	WorkflowSettings struct {
-		ID    string                 `json:"id"`
-		Other map[string]interface{} `json:"other"`
+		ID       string                                      `json:"id"`
+		Other    map[string]interface{}                      `json:"other"`
+		Bindings map[string]runtimesRegistry.BindingSettings `json:"bindings"`
 	}
 	BundledContent struct {
 		Source     []byte           `json:"source"`
@@ -22,13 +23,14 @@ type (
 	}
 
 	BundlerResult struct {
-		Bundle BundledContent `json:"bundle"`
-		Errors []error        `json:"errors"`
+		Content BundledContent `json:"bundle"`
+		Errors  []error        `json:"errors"`
 	}
 
 	BundlerOptions struct {
-		WorkingFolder string
-		EntryPoints   []string
+		WorkingFolder       string
+		EntryPoints         []string
+		IntrospectionExport string
 	}
 
 	WorkflowBundler interface {
@@ -41,6 +43,9 @@ type (
 )
 
 func NewWorkflowBundler(options BundlerOptions) WorkflowBundler {
+	if options.IntrospectionExport == "" {
+		options.IntrospectionExport = "workflowSettings"
+	}
 	return &builder{
 		bundleOptions: options,
 	}
@@ -81,14 +86,14 @@ func (b *builder) Bundle() BundlerResult {
 		}
 
 		file := tr.OutputFiles[0]
-		result.Bundle = BundledContent{
+		result.Content = BundledContent{
 			Source:     file.Contents,
 			BundleHash: file.Hash,
-			Settings:   result.discoverSettings(file.Contents),
+			Settings:   result.discoverSettings(b.bundleOptions.IntrospectionExport, file.Contents),
 		}
 	}
 
-	if result.Bundle.Settings.ID == "" {
+	if result.Content.Settings.ID == "" {
 		result.addError(errors.New("workflow id not found, please export workflowSettings.id"))
 	}
 
@@ -96,42 +101,34 @@ func (b *builder) Bundle() BundlerResult {
 }
 
 func (br *BundlerResult) HasOutput() bool {
-	return len(br.Bundle.Source) > 0
+	return len(br.Content.Source) > 0
 }
 
 func (br *BundlerResult) addError(err error) {
 	br.Errors = append(br.Errors, err)
 }
 
-func (br *BundlerResult) discoverSettings(source []byte) WorkflowSettings {
+func (br *BundlerResult) discoverSettings(exportName string, source []byte) WorkflowSettings {
 	goja, _ := runtimesRegistry.ResolveRuntime("goja")
 	introspectResult, _ := goja.Introspect(context.Background(),
 		runtimesRegistry.WorkflowDescriptor{
-			ProcessedSource: runtimesRegistry.CodeDescriptor{
+			ProcessedSource: runtimesRegistry.SourceDescriptor{
 				Source:     source,
 				SourceType: runtimesRegistry.Source_ContentType_Text,
-			},
-			Bindings: runtimesRegistry.Bindings{
-				GlobalModules: map[string]runtimesRegistry.ModuleBinding{
-					"console": {},
-					"url":     {},
-					"module":  {},
-					"kinde":   {},
-				},
 			},
 			Limits: runtimesRegistry.RuntimeLimits{
 				MaxExecutionDuration: 30 * time.Second,
 			},
 		},
 		runtimesRegistry.IntrospectionOptions{
-			Exports: []string{"workflowSettings"},
+			Exports: []string{exportName},
 		})
 
-	settings := introspectResult.GetExport("workflowSettings").ValueAsMap()
+	settings := introspectResult.GetExport(exportName)
 
 	var workflowID string
 
-	if id, ok := settings["id"]; ok {
+	if id, ok := settings.ValueAsMap()["id"]; ok {
 
 		switch idTyped := id.(type) {
 		case string:
@@ -140,7 +137,8 @@ func (br *BundlerResult) discoverSettings(source []byte) WorkflowSettings {
 	}
 
 	return WorkflowSettings{
-		ID:    workflowID,
-		Other: settings,
+		ID:       workflowID,
+		Other:    settings.ValueAsMap(),
+		Bindings: settings.BindingsFrom(exportName),
 	}
 }
