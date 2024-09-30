@@ -4,10 +4,25 @@ export const workflowSettings = {
     id: 'tokenGen',
     trigger: 'onTokenGeneration',
     resetClaims: true,
-    kindeAPIs: {
-        fetch: {}
+    bindings:{
+        "global": {
+            "console": {},
+        },
+        "native": {
+            "kinde.fetch": {},
+            "kinde.idToken": {},
+            "kinde.accessToken": {}
+        }
     }
 };
+
+// bindings: ["console", "kinde.fetch", "kinde.idToken", "kinde.accessToken"],
+// settings: {
+//     "console": {},
+//     "kinde.idToken": {
+//         "resetClaims": true
+//     },
+// }
 
 export default async function handle (event: any) {
         kinde.idToken.setCustomClaim('random', 'test');
@@ -16,5 +31,4 @@ export default async function handle (event: any) {
         await kinde.fetch("http://google.com");
         console.error('error log');
         return 'testing return';
-
 }

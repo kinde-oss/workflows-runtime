@@ -3,40 +3,23 @@ package workflows_runtime
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	goja_runtime "github.com/kinde-oss/workflows-runtime/gojaRuntime"
+	project_bundler "github.com/kinde-oss/workflows-runtime/projectBundler"
 	registry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
-func Test_GojaRuntime(t *testing.T) {
-	runtime, _ := GetRuntime("goja")
-
-	kindeAPI := runtime.(*goja_runtime.GojaRunnerV1).RegisterNativeAPI("kinde")
-	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
-		return "fetch response", nil
-	})
-
-	idTokenAPI := kindeAPI.RegisterNativeAPI("idToken")
-	idTokenAPI.RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
-		}
-		name, ok1 := args[0].(string)
-		value, ok2 := args[1].(string)
-		if !ok1 || !ok2 {
-			return nil, fmt.Errorf("arguments must be strings")
-		}
-		jsContext.SetValue("idToken", map[string]interface{}{name: value})
-		return nil, nil
-	})
+func Test_GojaPrecompiledRuntime(t *testing.T) {
+	runner := getGojaRunner()
 
 	for i := 0; i < 2; i++ {
 
-		result, err := runtime.Execute(context.Background(), registry.WorkflowDescriptor{
+		result, err := runner.Execute(context.Background(), registry.WorkflowDescriptor{
 			Limits: registry.RuntimeLimits{
 				MaxExecutionDuration: 30 * time.Second,
 			},
@@ -54,7 +37,6 @@ func Test_GojaRuntime(t *testing.T) {
 				Global: map[string]registry.ModuleBinding{
 					"console": {},
 					"url":     {},
-					"module":  {},
 				},
 				Native: map[string]registry.ModuleBinding{
 					"kinde.fetch":   {},
@@ -73,4 +55,95 @@ func Test_GojaRuntime(t *testing.T) {
 		assert.Nil(err)
 		assert.Equal("bbb", idTokenMap["aaa"])
 	}
+}
+
+func Test_ProjectBunlerE2E(t *testing.T) {
+	somePathInsideProject, _ := filepath.Abs("./testData/kindeSrc/environment/workflows") //starting in a middle of nowhere, so we need to go up to the root of the project
+
+	projectBundler := project_bundler.NewProjectBundler(project_bundler.DiscoveryOptions{
+		StartFolder: somePathInsideProject,
+	})
+
+	kindeProject, discoveryError := projectBundler.Discover()
+
+	assert := assert.New(t)
+
+	if !assert.Nil(discoveryError) {
+		t.FailNow()
+	}
+	assert.Equal("2024-12-09", kindeProject.Configuration.Version)
+	assert.Equal("kindeSrc", kindeProject.Configuration.RootDir)
+	assert.Equal(2, len(kindeProject.Environment.Workflows))
+	assert.Empty(kindeProject.Environment.Workflows[0].Bundle.Errors)
+	assert.Empty(kindeProject.Environment.Workflows[1].Bundle.Errors)
+
+	for _, workflow := range kindeProject.Environment.Workflows {
+		t.Run(fmt.Sprintf("Test_ExecuteWorkflowWithGoja - %v", workflow.WorkflowRootDirectory), testExecution(workflow, assert))
+	}
+
+}
+
+func testExecution(workflow project_bundler.KindeWorkflow, assert *assert.Assertions) func(t *testing.T) {
+	return func(t *testing.T) {
+		runner := getGojaRunner()
+		result, err := runner.Execute(context.Background(), registry.WorkflowDescriptor{
+			Limits: registry.RuntimeLimits{
+				MaxExecutionDuration: 30 * time.Second,
+			},
+			ProcessedSource: registry.SourceDescriptor{
+				Source:     workflow.Bundle.Content.Source,
+				SourceType: registry.Source_ContentType_Text,
+			},
+			RequestedBindings: workflow.Bundle.Content.Settings.Bindings,
+		}, registry.StartOptions{
+			EntryPoint: "handle",
+		})
+
+		if !assert.Nil(err) {
+			t.FailNow()
+		}
+		assert.Equal("testing return", fmt.Sprintf("%v", result.GetExitResult()))
+
+		idTokenMap, err := result.GetContext().GetValueAsMap("idToken")
+		assert.Nil(err)
+		assert.Equal("test", idTokenMap["random"])
+
+		accessTokenMap, err := result.GetContext().GetValueAsMap("accessToken")
+		assert.Nil(err)
+		assert.NotNil(accessTokenMap["test2"])
+	}
+}
+
+func getGojaRunner() registry.Runner {
+	runtime, _ := GetRuntime("goja")
+
+	kindeAPI := runtime.(*goja_runtime.GojaRunnerV1).RegisterNativeAPI("kinde")
+	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
+		return "fetch response", nil
+	})
+
+	kindeAPI.RegisterNativeAPI("idToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
+		}
+		name, ok1 := args[0].(string)
+		if !ok1 {
+			return nil, fmt.Errorf("first argument must be string")
+		}
+		jsContext.SetValue("idToken", map[string]interface{}{name: args[1]})
+		return nil, nil
+	})
+
+	kindeAPI.RegisterNativeAPI("accessToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext goja_runtime.JsContext, args ...interface{}) (interface{}, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
+		}
+		name, ok1 := args[0].(string)
+		if !ok1 {
+			return nil, fmt.Errorf("first argument must be string")
+		}
+		jsContext.SetValue("accessToken", map[string]interface{}{name: args[1]})
+		return nil, nil
+	})
+	return runtime
 }

@@ -2,6 +2,7 @@ package goja_runtime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -25,11 +26,12 @@ type (
 	actionResult struct {
 		ConsoleLog   []interface{} `json:"console_log"`
 		ConsoleError []interface{} `json:"console_error"`
-		Context      jsContext     `json:"context"`
+		Context      *jsContext    `json:"context"`
 		ExitResult   interface{}   `json:"exit_result"`
 	}
 	introspectedExport struct {
-		value interface{}
+		value    interface{}
+		bindings *runtimesRegistry.Bindings
 	}
 
 	introspectionResult struct {
@@ -43,6 +45,11 @@ type (
 		data map[string]interface{}
 	}
 )
+
+// BindingsFrom implements runtime_registry.IntrospectedExport.
+func (i introspectedExport) BindingsFrom(exportName string) runtimesRegistry.Bindings {
+	return *i.bindings
+}
 
 // SetValue implements JsContext.
 func (j jsContext) SetValue(key string, value interface{}) {
@@ -73,8 +80,27 @@ func (i introspectionResult) GetExport(name string) runtimesRegistry.Introspecte
 }
 
 func (i introspectionResult) recordExport(name string, value interface{}) {
+
+	mapBindings := func(key string, value interface{}) *runtimesRegistry.Bindings {
+		if value == nil {
+			return nil
+		}
+
+		bindings := value.(map[string]interface{})[key]
+
+		marshalled, _ := json.Marshal(bindings)
+		result := &runtimesRegistry.Bindings{}
+		err := json.Unmarshal(marshalled, result)
+		if err != nil {
+			return nil
+		}
+		return result
+
+	}
+
 	i.exports[name] = introspectedExport{
-		value: value,
+		value:    value,
+		bindings: mapBindings("bindings", value),
 	}
 }
 
@@ -99,7 +125,7 @@ func (j jsContext) GetValues() map[string]interface{} {
 }
 
 // GetValueAsMap implements runtime_registry.RuntimeContext.
-func (j jsContext) GetValueAsMap(key string) (map[string]interface{}, error) {
+func (j *jsContext) GetValueAsMap(key string) (map[string]interface{}, error) {
 	if value, ok := j.data[key]; ok {
 		switch v := value.(type) {
 		case map[string]interface{}:
@@ -156,7 +182,7 @@ func (nm *NativeModule) setupModuleForVM(vm *goja.Runtime, actionResult *actionR
 					return function(binding, jsContext, args...)
 				}
 			}
-			parent.Set(name, vm.ToValue(wrappedFunc(binding, actionResult.Context)))
+			parent.Set(name, vm.ToValue(wrappedFunc(binding, *actionResult.Context)))
 		}
 
 		if name == "" {
@@ -168,7 +194,7 @@ func (nm *NativeModule) setupModuleForVM(vm *goja.Runtime, actionResult *actionR
 					}
 				}
 
-				parent.Set(fname, vm.ToValue(wrappedFunc(binding, actionResult.Context)))
+				parent.Set(fname, vm.ToValue(wrappedFunc(binding, *actionResult.Context)))
 			}
 			return
 		}
@@ -272,12 +298,16 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 		return nil, fmt.Errorf("no default export")
 	}
 
-	targetVmFunction := defaultExport.ToObject(vm).Get(startOptions.EntryPoint)
-	if targetVmFunction == nil {
-		return nil, fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
-	}
 	var callableFunction goja.Callable
-	vm.ExportTo(targetVmFunction, &callableFunction)
+	if callabla, isFunction := goja.AssertFunction(defaultExport); isFunction {
+		callableFunction = callabla
+	} else {
+		targetVmFunction := defaultExport.ToObject(vm).Get(startOptions.EntryPoint)
+		if targetVmFunction == nil {
+			return nil, fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
+		}
+		vm.ExportTo(targetVmFunction, &callableFunction)
+	}
 
 	functionParams := []goja.Value{}
 	for _, arg := range startOptions.Arguments {
@@ -327,7 +357,7 @@ func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workf
 	executionResult := &actionResult{
 		ConsoleLog:   []interface{}{},
 		ConsoleError: []interface{}{},
-		Context: jsContext{
+		Context: &jsContext{
 			data: map[string]interface{}{},
 		},
 	}
@@ -340,6 +370,10 @@ func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workf
 
 	for requestedName, requestedBinding := range workflow.RequestedBindings.Native {
 		runner.nativeModules.setupModuleForVM(vm, executionResult, requestedName, requestedBinding)
+	}
+
+	if vm.Get("module") == nil { //esModules prerequisite
+		vm.Set("module", vm.NewObject())
 	}
 
 	workflowHash := workflow.GetHash()

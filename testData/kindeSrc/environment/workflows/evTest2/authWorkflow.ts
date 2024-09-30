@@ -3,7 +3,17 @@ import {hello} from "./hello"
 export const workflowSettings = {
     id: 'tokenGen2',
     trigger: 'onTokenGeneration2',
-    resetClaims: true
+    resetClaims: true,
+    bindings:{
+        "global": {
+            "console": {},
+        },
+        "native": {
+            "kinde.fetch": {},
+            "kinde.idToken": {},
+            "kinde.accessToken": {}
+        }
+    }
 };
 
 export default {

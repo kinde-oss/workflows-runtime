@@ -27,16 +27,13 @@ type (
 		BuildHash  string            `json:"build_hash"`
 	}
 
-	ModuleBindingConfiguration struct {
-		Settings map[string]interface{} `json:"configuration"`
-	}
 	ModuleBinding struct {
-		Configuration ModuleBindingConfiguration `json:"configuration"`
+		Settings map[string]interface{} `json:"settings"`
 	}
 
 	Bindings struct {
-		Global map[string]ModuleBinding `json:"global_modules"`
-		Native map[string]ModuleBinding `json:"native_modules"`
+		Global map[string]ModuleBinding `json:"global"`
+		Native map[string]ModuleBinding `json:"native"`
 	}
 
 	RuntimeLimits struct {
@@ -65,6 +62,7 @@ type (
 		HasExport() bool
 		Value() interface{}
 		ValueAsMap() map[string]interface{}
+		BindingsFrom(exportName string) Bindings
 	}
 
 	IntrospectionResult interface {
