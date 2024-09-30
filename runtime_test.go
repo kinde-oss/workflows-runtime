@@ -115,7 +115,7 @@ func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Asserti
 func getGojaRunner() registry.Runner {
 	runtime, _ := GetRuntime("goja")
 
-	kindeAPI := runtime.(*gojaRuntime.GojaRunnerV1).RegisterNativeAPI("kinde")
+	kindeAPI := gojaRuntime.RegisterNativeAPI("kinde")
 	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		return "fetch response", nil
 	})

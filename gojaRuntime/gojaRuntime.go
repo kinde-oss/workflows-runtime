@@ -168,14 +168,16 @@ func init() {
 	registry.RegisterNativeModule("url", urlModule.Require)
 }
 
+var __nativeModules = nativeModules{
+	registered: map[string]*NativeModule{},
+}
+
 func newGojaRunner() runtimesRegistry.Runner {
 	runner := GojaRunnerV1{
 		cache: &gojaCache{
 			cache: map[string]*goja.Program{},
 		},
-		nativeModules: nativeModules{
-			registered: map[string]*NativeModule{},
-		},
+		nativeModules: __nativeModules,
 	}
 	return &runner
 }
@@ -234,13 +236,13 @@ type NativeModule struct {
 	name      string
 }
 
-func (runner GojaRunnerV1) RegisterNativeAPI(name string) *NativeModule {
+func RegisterNativeAPI(name string) *NativeModule {
 	result := &NativeModule{
 		functions: map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
 		modules:   map[string]*NativeModule{},
 		name:      name,
 	}
-	runner.nativeModules.registered[name] = result
+	__nativeModules.registered[name] = result
 	return result
 }
 
