@@ -3,26 +3,17 @@ import {hello} from "./hello"
 export const workflowSettings = {
     id: 'tokenGen',
     trigger: 'onTokenGeneration',
-    resetClaims: true,
     bindings:{
-        "global": {
-            "console": {},
+        "console": {},
+        "kinde.fetch": {},
+        "kinde.idToken": {
+            resetClaims: true
         },
-        "native": {
-            "kinde.fetch": {},
-            "kinde.idToken": {},
-            "kinde.accessToken": {}
+        "kinde.accessToken": {
+            resetClaims: true
         }
     }
 };
-
-// bindings: ["console", "kinde.fetch", "kinde.idToken", "kinde.accessToken"],
-// settings: {
-//     "console": {},
-//     "kinde.idToken": {
-//         "resetClaims": true
-//     },
-// }
 
 export default async function handle (event: any) {
         kinde.idToken.setCustomClaim('random', 'test');

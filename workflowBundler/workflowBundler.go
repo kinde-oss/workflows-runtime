@@ -12,9 +12,9 @@ import (
 
 type (
 	WorkflowSettings struct {
-		ID       string                    `json:"id"`
-		Other    map[string]interface{}    `json:"other"`
-		Bindings runtimesRegistry.Bindings `json:"bindings"`
+		ID       string                                      `json:"id"`
+		Other    map[string]interface{}                      `json:"other"`
+		Bindings map[string]runtimesRegistry.BindingSettings `json:"bindings"`
 	}
 	BundledContent struct {
 		Source     []byte           `json:"source"`

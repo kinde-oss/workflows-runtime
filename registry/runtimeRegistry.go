@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base32"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -27,23 +28,23 @@ type (
 		BuildHash  string            `json:"build_hash"`
 	}
 
-	ModuleBinding struct {
+	BindingSettings struct {
 		Settings map[string]interface{} `json:"settings"`
 	}
 
-	Bindings struct {
-		Global map[string]ModuleBinding `json:"global"`
-		Native map[string]ModuleBinding `json:"native"`
-	}
+	// Bindings struct {
+	// 	Global map[string]ModuleBinding `json:"global"`
+	// 	Native map[string]ModuleBinding `json:"native"`
+	// }
 
 	RuntimeLimits struct {
 		MaxExecutionDuration time.Duration `json:"max_execution_duration"`
 	}
 
 	WorkflowDescriptor struct {
-		ProcessedSource   SourceDescriptor `json:"processed_source"`
-		RequestedBindings Bindings         `json:"bindings"`
-		Limits            RuntimeLimits    `json:"runtime_limits"`
+		ProcessedSource   SourceDescriptor           `json:"processed_source"`
+		RequestedBindings map[string]BindingSettings `json:"bindings"`
+		Limits            RuntimeLimits              `json:"runtime_limits"`
 	}
 
 	RuntimeContext interface {
@@ -62,7 +63,7 @@ type (
 		HasExport() bool
 		Value() interface{}
 		ValueAsMap() map[string]interface{}
-		BindingsFrom(exportName string) Bindings
+		BindingsFrom(exportName string) map[string]BindingSettings
 	}
 
 	IntrospectionResult interface {
@@ -78,6 +79,13 @@ type (
 		Introspect(ctx context.Context, workflow WorkflowDescriptor, options IntrospectionOptions) (IntrospectionResult, error)
 	}
 )
+
+func (settings *BindingSettings) UnmarshalJSON(data []byte) error {
+	jsonMap := map[string]interface{}{}
+	err := json.Unmarshal(data, &jsonMap)
+	settings.Settings = jsonMap
+	return err
+}
 
 var runtimes map[string]func() Runner = map[string]func() Runner{}
 

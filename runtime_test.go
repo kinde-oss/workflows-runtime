@@ -33,15 +33,11 @@ func Test_GojaPrecompiledRuntime(t *testing.T) {
 			`),
 				SourceType: registry.Source_ContentType_Text,
 			},
-			RequestedBindings: registry.Bindings{
-				Global: map[string]registry.ModuleBinding{
-					"console": {},
-					"url":     {},
-				},
-				Native: map[string]registry.ModuleBinding{
-					"kinde.fetch":   {},
-					"kinde.idToken": {},
-				},
+			RequestedBindings: map[string]registry.BindingSettings{
+				"console":       {},
+				"url":           {},
+				"kinde.fetch":   {},
+				"kinde.idToken": {},
 			},
 		}, registry.StartOptions{
 			EntryPoint: "handle",
@@ -118,11 +114,11 @@ func getGojaRunner() registry.Runner {
 	runtime, _ := GetRuntime("goja")
 
 	kindeAPI := runtime.(*gojaRuntime.GojaRunnerV1).RegisterNativeAPI("kinde")
-	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.ModuleBinding, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		return "fetch response", nil
 	})
 
-	kindeAPI.RegisterNativeAPI("idToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeAPI("idToken").RegisterNativeFunction("setCustomClaim", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
 		}
@@ -134,7 +130,7 @@ func getGojaRunner() registry.Runner {
 		return nil, nil
 	})
 
-	kindeAPI.RegisterNativeAPI("accessToken").RegisterNativeFunction("setCustomClaim", func(binding registry.ModuleBinding, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeAPI("accessToken").RegisterNativeFunction("setCustomClaim", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
 		}
