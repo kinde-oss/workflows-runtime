@@ -50,6 +50,8 @@ func Test_GojaPrecompiledRuntime(t *testing.T) {
 		idTokenMap, err := result.GetContext().GetValueAsMap("idToken")
 		assert.Nil(err)
 		assert.Equal("bbb", idTokenMap["aaa"])
+		assert.Greater(result.ExecutionMetadata().ExecutionDuration.Nanoseconds(), int64(1))
+		assert.False(result.ExecutionMetadata().StartedAt.IsZero())
 	}
 }
 
@@ -113,7 +115,7 @@ func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Asserti
 func getGojaRunner() registry.Runner {
 	runtime, _ := GetRuntime("goja")
 
-	kindeAPI := runtime.(*gojaRuntime.GojaRunnerV1).RegisterNativeAPI("kinde")
+	kindeAPI := gojaRuntime.RegisterNativeAPI("kinde")
 	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		return "fetch response", nil
 	})

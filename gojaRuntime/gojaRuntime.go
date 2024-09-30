@@ -24,10 +24,11 @@ type (
 	}
 
 	actionResult struct {
-		ConsoleLog   []interface{} `json:"console_log"`
-		ConsoleError []interface{} `json:"console_error"`
-		Context      *jsContext    `json:"context"`
-		ExitResult   interface{}   `json:"exit_result"`
+		ConsoleLog   []interface{}                       `json:"console_log"`
+		ConsoleError []interface{}                       `json:"console_error"`
+		Context      *jsContext                          `json:"context"`
+		ExitResult   interface{}                         `json:"exit_result"`
+		RunMetadata  *runtimesRegistry.ExecutionMetadata `json:"run_metadata"`
 	}
 	introspectedExport struct {
 		value    interface{}
@@ -45,6 +46,11 @@ type (
 		data map[string]interface{}
 	}
 )
+
+// ExecutionMetadata implements runtime_registry.ExecutionResult.
+func (a *actionResult) ExecutionMetadata() runtimesRegistry.ExecutionMetadata {
+	return *a.RunMetadata
+}
 
 // BindingsFrom implements runtime_registry.IntrospectedExport.
 func (i introspectedExport) BindingsFrom(exportName string) map[string]runtimesRegistry.BindingSettings {
@@ -162,14 +168,16 @@ func init() {
 	registry.RegisterNativeModule("url", urlModule.Require)
 }
 
+var __nativeModules = nativeModules{
+	registered: map[string]*NativeModule{},
+}
+
 func newGojaRunner() runtimesRegistry.Runner {
 	runner := GojaRunnerV1{
 		cache: &gojaCache{
 			cache: map[string]*goja.Program{},
 		},
-		nativeModules: nativeModules{
-			registered: map[string]*NativeModule{},
-		},
+		nativeModules: __nativeModules,
 	}
 	return &runner
 }
@@ -228,13 +236,13 @@ type NativeModule struct {
 	name      string
 }
 
-func (runner GojaRunnerV1) RegisterNativeAPI(name string) *NativeModule {
+func RegisterNativeAPI(name string) *NativeModule {
 	result := &NativeModule{
 		functions: map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
 		modules:   map[string]*NativeModule{},
 		name:      name,
 	}
-	runner.nativeModules.registered[name] = result
+	__nativeModules.registered[name] = result
 	return result
 }
 
@@ -344,6 +352,7 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	}
 
 	executionResult.ExitResult = promise.Result().Export()
+	executionResult.RunMetadata.ExecutionDuration = time.Since(executionResult.RunMetadata.StartedAt)
 
 	return executionResult, nil
 }
@@ -359,6 +368,9 @@ func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workf
 		ConsoleError: []interface{}{},
 		Context: &jsContext{
 			data: map[string]interface{}{},
+		},
+		RunMetadata: &runtimesRegistry.ExecutionMetadata{
+			StartedAt: time.Now(),
 		},
 	}
 
