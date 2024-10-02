@@ -87,6 +87,10 @@ func (settings *BindingSettings) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+func (settings BindingSettings) MarshalJSON() ([]byte, error) {
+	return json.Marshal(settings.Settings)
+}
+
 var runtimes map[string]func() Runner = map[string]func() Runner{}
 
 // not thread safe, should be called as part of init

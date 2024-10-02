@@ -23,8 +23,9 @@ type (
 	}
 
 	BundlerResult struct {
-		Content BundledContent `json:"bundle"`
-		Errors  []error        `json:"errors"`
+		Content           BundledContent `json:"bundle"`
+		Errors            []error        `json:"errors"`
+		CompilationErrors []interface{}  `json:"compilation_errors"`
 	}
 
 	BundlerOptions struct {
@@ -65,7 +66,7 @@ func (b *builder) Bundle() BundlerResult {
 		SourcesContent:   api.SourcesContentInclude,
 		LegalComments:    api.LegalCommentsNone,
 		Platform:         api.PlatformDefault,
-		LogLevel:         api.LogLevelError,
+		LogLevel:         api.LogLevelSilent,
 		Charset:          api.CharsetUTF8,
 		EntryPoints:      b.bundleOptions.EntryPoints,
 		Bundle:           true,
@@ -81,7 +82,7 @@ func (b *builder) Bundle() BundlerResult {
 
 	if len(tr.OutputFiles) > 0 {
 
-		if len(tr.Errors) > 1 {
+		if len(tr.OutputFiles) > 1 {
 			result.addError(errors.New("build produced multiple files, a single output is supported only"))
 		}
 
@@ -93,6 +94,11 @@ func (b *builder) Bundle() BundlerResult {
 		}
 	}
 
+	for _, buildError := range tr.Errors {
+		result.addCompilationError(buildError)
+
+	}
+
 	if result.Content.Settings.ID == "" {
 		result.addError(errors.New("workflow id not found, please export workflowSettings.id"))
 	}
@@ -102,6 +108,10 @@ func (b *builder) Bundle() BundlerResult {
 
 func (br *BundlerResult) HasOutput() bool {
 	return len(br.Content.Source) > 0
+}
+
+func (br *BundlerResult) addCompilationError(err interface{}) {
+	br.CompilationErrors = append(br.CompilationErrors, err)
 }
 
 func (br *BundlerResult) addError(err error) {
