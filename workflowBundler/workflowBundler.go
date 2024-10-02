@@ -66,7 +66,7 @@ func (b *builder) Bundle() BundlerResult {
 		SourcesContent:   api.SourcesContentInclude,
 		LegalComments:    api.LegalCommentsNone,
 		Platform:         api.PlatformDefault,
-		LogLevel:         api.LogLevelError,
+		LogLevel:         api.LogLevelSilent,
 		Charset:          api.CharsetUTF8,
 		EntryPoints:      b.bundleOptions.EntryPoints,
 		Bundle:           true,
