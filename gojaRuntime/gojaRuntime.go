@@ -40,6 +40,7 @@ type (
 	}
 
 	JsContext interface {
+		GetValue(key string) interface{}
 		SetValue(key string, value interface{})
 	}
 	jsContext struct {
@@ -55,6 +56,11 @@ func (a *actionResult) ExecutionMetadata() runtimesRegistry.ExecutionMetadata {
 // BindingsFrom implements runtime_registry.IntrospectedExport.
 func (i introspectedExport) BindingsFrom(exportName string) map[string]runtimesRegistry.BindingSettings {
 	return i.bindings
+}
+
+// GetValue implements JsContext.
+func (j jsContext) GetValue(key string) interface{} {
+	return j.data[key]
 }
 
 // SetValue implements JsContext.
