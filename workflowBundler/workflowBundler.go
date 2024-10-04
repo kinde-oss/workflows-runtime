@@ -24,7 +24,7 @@ type (
 
 	BundlerResult struct {
 		Content           BundledContent `json:"bundle"`
-		Errors            []error        `json:"errors"`
+		Errors            []string       `json:"errors"`
 		CompilationErrors []interface{}  `json:"compilation_errors"`
 	}
 
@@ -115,7 +115,7 @@ func (br *BundlerResult) addCompilationError(err interface{}) {
 }
 
 func (br *BundlerResult) addError(err error) {
-	br.Errors = append(br.Errors, err)
+	br.Errors = append(br.Errors, err.Error())
 }
 
 func (br *BundlerResult) discoverSettings(exportName string, source []byte) WorkflowSettings {
