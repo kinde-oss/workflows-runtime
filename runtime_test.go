@@ -48,8 +48,8 @@ func Test_GojaPrecompiledRuntime(t *testing.T) {
 		assert.Nil(err)
 		assert.Equal("fetch response", fmt.Sprintf("%v", result.GetExitResult()))
 
-		idTokenMap, err := result.GetContext().GetValueAsMap("idToken")
-		assert.Nil(err)
+		idTokenMap, ok := result.GetContext().GetValueAsMap("idToken")
+		assert.True(ok)
 		assert.Equal("bbb", idTokenMap["aaa"])
 		assert.Greater(result.ExecutionMetadata().ExecutionDuration.Nanoseconds(), int64(1))
 		assert.False(result.ExecutionMetadata().StartedAt.IsZero())
@@ -105,12 +105,12 @@ func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Asserti
 		}
 		assert.Equal("testing return", fmt.Sprintf("%v", result.GetExitResult()))
 
-		idTokenMap, err := result.GetContext().GetValueAsMap("idToken")
-		assert.Nil(err)
+		idTokenMap, ok := result.GetContext().GetValueAsMap("idToken")
+		assert.True(ok)
 		assert.Equal("test", idTokenMap["random"])
 
-		accessTokenMap, err := result.GetContext().GetValueAsMap("accessToken")
-		assert.Nil(err)
+		accessTokenMap, ok := result.GetContext().GetValueAsMap("accessToken")
+		assert.True(ok)
 		assert.NotNil(accessTokenMap["test2"])
 
 		logMessage := logger.info.([]interface{})[0].(string)
@@ -146,8 +146,8 @@ func getGojaRunner() registry.Runner {
 		if !ok1 {
 			return nil, fmt.Errorf("first argument must be string")
 		}
-		at := jsContext.GetValue("accessToken")
-		if at == nil {
+		at, ok := jsContext.GetValue("accessToken")
+		if !ok {
 			at = make(map[string]interface{})
 		}
 		at.(map[string]interface{})[name] = args[1]
