@@ -57,7 +57,7 @@ type (
 
 	RuntimeContext interface {
 		GetValues() map[string]interface{}
-		GetValueAsMap(key string) (map[string]interface{}, error)
+		GetValueAsMap(key string) (map[string]interface{}, bool)
 	}
 
 	ExecutionMetadata struct {

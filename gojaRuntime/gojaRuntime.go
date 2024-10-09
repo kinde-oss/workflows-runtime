@@ -39,7 +39,7 @@ type (
 	}
 
 	JsContext interface {
-		GetValue(key string) interface{}
+		GetValue(key string) (interface{}, bool)
 		SetValue(key string, value interface{})
 	}
 	jsContext struct {
@@ -58,8 +58,9 @@ func (i introspectedExport) BindingsFrom(exportName string) map[string]runtimesR
 }
 
 // GetValue implements JsContext.
-func (j jsContext) GetValue(key string) interface{} {
-	return j.data[key]
+func (j jsContext) GetValue(key string) (interface{}, bool) {
+	val, ok := j.data[key]
+	return val, ok
 }
 
 // SetValue implements JsContext.
@@ -126,16 +127,16 @@ func (j jsContext) GetValues() map[string]interface{} {
 }
 
 // GetValueAsMap implements runtime_registry.RuntimeContext.
-func (j *jsContext) GetValueAsMap(key string) (map[string]interface{}, error) {
+func (j *jsContext) GetValueAsMap(key string) (map[string]interface{}, bool) {
 	if value, ok := j.data[key]; ok {
 		switch v := value.(type) {
 		case map[string]interface{}:
-			return v, nil
+			return v, true
 		default:
-			return nil, fmt.Errorf("value is not a map")
+			return nil, false
 		}
 	}
-	return nil, fmt.Errorf("key not found")
+	return nil, false
 }
 
 func (a *actionResult) GetExitResult() interface{} {
