@@ -12,14 +12,27 @@ import (
 const (
 	Source_ContentType_Text   SourceContentType = iota
 	Source_ContentType_Binary                   = iota
+
+	LogLevelInfo LogLevel = iota
+	LogLevelDebug
+	LogLevelWarning
+	LogLevelError
+	LogLevelSilent
 )
 
 type (
 	SourceContentType int
 
+	LogLevel int
+
+	Logger interface {
+		Log(level LogLevel, params ...interface{})
+	}
+
 	StartOptions struct {
 		EntryPoint string
 		Arguments  []interface{}
+		Loggger    Logger
 	}
 
 	SourceDescriptor struct {
@@ -48,14 +61,13 @@ type (
 	}
 
 	ExecutionMetadata struct {
-		StartedAt         time.Time     `json:"started_at"`
-		ExecutionDuration time.Duration `json:"execution_duration"`
+		StartedAt          time.Time     `json:"started_at"`
+		ExecutionDuration  time.Duration `json:"execution_duration"`
+		HasRunToCompletion bool          `json:"has_run_to_completion"`
 	}
 	ExecutionResult interface {
 		ExecutionMetadata() ExecutionMetadata
 		GetExitResult() interface{}
-		GetConsoleLog() []interface{}
-		GetConsoleError() []interface{}
 		GetContext() RuntimeContext
 	}
 
@@ -72,6 +84,7 @@ type (
 
 	IntrospectionOptions struct {
 		Exports []string
+		Logger  Logger
 	}
 
 	Runner interface {

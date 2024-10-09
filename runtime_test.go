@@ -85,6 +85,7 @@ func Test_ProjectBunlerE2E(t *testing.T) {
 func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Assertions) func(t *testing.T) {
 	return func(t *testing.T) {
 		runner := getGojaRunner()
+		logger := testLogger{}
 		result, err := runner.Execute(context.Background(), registry.WorkflowDescriptor{
 			Limits: registry.RuntimeLimits{
 				MaxExecutionDuration: 30 * time.Second,
@@ -96,6 +97,7 @@ func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Asserti
 			RequestedBindings: workflow.Bundle.Content.Settings.Bindings,
 		}, registry.StartOptions{
 			EntryPoint: "handle",
+			Loggger:    &logger,
 		})
 
 		if !assert.Nil(err) {
@@ -110,6 +112,9 @@ func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Asserti
 		accessTokenMap, err := result.GetContext().GetValueAsMap("accessToken")
 		assert.Nil(err)
 		assert.NotNil(accessTokenMap["test2"])
+
+		logMessage := logger.info.([]interface{})[0].(string)
+		assert.Equal("logging from action", logMessage)
 	}
 }
 
@@ -151,4 +156,26 @@ func getGojaRunner() registry.Runner {
 		return nil, nil
 	})
 	return runtime
+}
+
+type testLogger struct {
+	info    interface{}
+	debug   interface{}
+	err     interface{}
+	warning interface{}
+}
+
+func (l *testLogger) Log(level registry.LogLevel, args ...interface{}) {
+	switch level {
+	case registry.LogLevelDebug:
+		l.debug = args
+	case registry.LogLevelError:
+		l.err = args
+	case registry.LogLevelInfo:
+		l.info = args
+	case registry.LogLevelWarning:
+		l.warning = args
+	default:
+		panic(fmt.Sprintf("unexpected runtime_registry.LogLevel: %#v", level))
+	}
 }

@@ -24,11 +24,10 @@ type (
 	}
 
 	actionResult struct {
-		ConsoleLog   []interface{}                       `json:"console_log"`
-		ConsoleError []interface{}                       `json:"console_error"`
-		Context      *jsContext                          `json:"context"`
-		ExitResult   interface{}                         `json:"exit_result"`
-		RunMetadata  *runtimesRegistry.ExecutionMetadata `json:"run_metadata"`
+		Context     *jsContext                          `json:"context"`
+		ExitResult  interface{}                         `json:"exit_result"`
+		RunMetadata *runtimesRegistry.ExecutionMetadata `json:"run_metadata"`
+		logger      runtimesRegistry.Logger
 	}
 	introspectedExport struct {
 		value    interface{}
@@ -114,16 +113,6 @@ func (i introspectionResult) recordExport(name string, value interface{}) {
 		value:    value,
 		bindings: mapBindings("bindings", value),
 	}
-}
-
-// GetConsoleError implements runtime_registry.Result.
-func (a *actionResult) GetConsoleError() []interface{} {
-	return a.ConsoleError
-}
-
-// GetConsoleLog implements runtime_registry.Result.
-func (a *actionResult) GetConsoleLog() []interface{} {
-	return a.ConsoleLog
 }
 
 // GetContext implements runtime_registry.Result.
@@ -270,7 +259,7 @@ func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
 // Introspect implements runtime_registry.Runner.
 func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
-	_, returnErr := e.setupVM(ctx, vm, workflow)
+	_, returnErr := e.setupVM(ctx, vm, workflow, options.Logger)
 
 	if returnErr != nil {
 		return nil, returnErr
@@ -298,7 +287,11 @@ func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry
 func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, startOptions runtimesRegistry.StartOptions) (runtimesRegistry.ExecutionResult, error) {
 
 	vm := goja.New()
-	executionResult, returnErr := e.setupVM(ctx, vm, workflow)
+	executionResult, returnErr := e.setupVM(ctx, vm, workflow, startOptions.Loggger)
+
+	defer func(startedAt time.Time) {
+		executionResult.RunMetadata.ExecutionDuration = time.Since(startedAt)
+	}(executionResult.RunMetadata.StartedAt)
 
 	if returnErr != nil {
 		return executionResult, returnErr
@@ -358,20 +351,19 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	}
 
 	executionResult.ExitResult = promise.Result().Export()
-	executionResult.RunMetadata.ExecutionDuration = time.Since(executionResult.RunMetadata.StartedAt)
+	executionResult.RunMetadata.HasRunToCompletion = true
 
 	return executionResult, nil
 }
 
-func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workflow runtimesRegistry.WorkflowDescriptor) (*actionResult, error) {
+func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workflow runtimesRegistry.WorkflowDescriptor, logger runtimesRegistry.Logger) (*actionResult, error) {
 	registry.Enable(vm)
 
 	runner.maxExecutionTimeout(ctx, vm, workflow.Limits.MaxExecutionDuration)
 	vm.SetTimeSource(func() time.Time { return time.Now() })
 
 	executionResult := &actionResult{
-		ConsoleLog:   []interface{}{},
-		ConsoleError: []interface{}{},
+		logger: logger,
 		Context: &jsContext{
 			data: map[string]interface{}{},
 		},
@@ -440,19 +432,19 @@ func (*GojaRunnerV1) maxExecutionTimeout(ctx context.Context, vm *goja.Runtime, 
 
 func (*GojaRunnerV1) consoleEmulation(_ *goja.Runtime, mountingPoint *goja.Object, result *actionResult, _ runtimesRegistry.BindingSettings) {
 
-	infoFunc := func(arguments ...interface{}) (interface{}, error) {
-		result.ConsoleLog = append(result.ConsoleLog, arguments)
-		return arguments, nil
+	logFunc := func(level runtimesRegistry.LogLevel) func(arguments ...interface{}) (interface{}, error) {
+		return func(arguments ...interface{}) (interface{}, error) {
+			if result.logger == nil {
+				return arguments, nil
+			}
+			result.logger.Log(level, arguments...)
+			return arguments, nil
+		}
 	}
 
-	errorFunc := func(arguments ...interface{}) (interface{}, error) {
-		result.ConsoleError = append(result.ConsoleError, arguments)
-		return arguments, nil
-	}
-
-	mountingPoint.Set("log", infoFunc)
-	mountingPoint.Set("info", infoFunc)
-	mountingPoint.Set("debug", infoFunc)
-	mountingPoint.Set("warn", errorFunc)
-	mountingPoint.Set("error", errorFunc)
+	mountingPoint.Set("log", logFunc(runtimesRegistry.LogLevelInfo))
+	mountingPoint.Set("info", logFunc(runtimesRegistry.LogLevelInfo))
+	mountingPoint.Set("debug", logFunc(runtimesRegistry.LogLevelDebug))
+	mountingPoint.Set("warn", logFunc(runtimesRegistry.LogLevelWarning))
+	mountingPoint.Set("error", logFunc(runtimesRegistry.LogLevelError))
 }
