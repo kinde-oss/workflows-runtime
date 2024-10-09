@@ -25,14 +25,14 @@ type (
 
 	LogLevel int
 
-	RuntimeLogger interface {
+	Logger interface {
 		Log(level LogLevel, params ...interface{})
 	}
 
 	StartOptions struct {
 		EntryPoint string
 		Arguments  []interface{}
-		Loggger    RuntimeLogger
+		Loggger    Logger
 	}
 
 	SourceDescriptor struct {
@@ -84,6 +84,7 @@ type (
 
 	IntrospectionOptions struct {
 		Exports []string
+		Logger  Logger
 	}
 
 	Runner interface {

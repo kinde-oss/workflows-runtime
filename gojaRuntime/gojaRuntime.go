@@ -27,7 +27,7 @@ type (
 		Context     *jsContext                          `json:"context"`
 		ExitResult  interface{}                         `json:"exit_result"`
 		RunMetadata *runtimesRegistry.ExecutionMetadata `json:"run_metadata"`
-		logger      runtimesRegistry.RuntimeLogger
+		logger      runtimesRegistry.Logger
 	}
 	introspectedExport struct {
 		value    interface{}
@@ -259,7 +259,7 @@ func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
 // Introspect implements runtime_registry.Runner.
 func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
-	_, returnErr := e.setupVM(ctx, vm, workflow)
+	_, returnErr := e.setupVM(ctx, vm, workflow, options.Logger)
 
 	if returnErr != nil {
 		return nil, returnErr
@@ -287,7 +287,7 @@ func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry
 func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, startOptions runtimesRegistry.StartOptions) (runtimesRegistry.ExecutionResult, error) {
 
 	vm := goja.New()
-	executionResult, returnErr := e.setupVM(ctx, vm, workflow)
+	executionResult, returnErr := e.setupVM(ctx, vm, workflow, startOptions.Loggger)
 
 	defer func(startedAt time.Time) {
 		executionResult.RunMetadata.ExecutionDuration = time.Since(startedAt)
@@ -356,13 +356,14 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	return executionResult, nil
 }
 
-func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workflow runtimesRegistry.WorkflowDescriptor) (*actionResult, error) {
+func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workflow runtimesRegistry.WorkflowDescriptor, logger runtimesRegistry.Logger) (*actionResult, error) {
 	registry.Enable(vm)
 
 	runner.maxExecutionTimeout(ctx, vm, workflow.Limits.MaxExecutionDuration)
 	vm.SetTimeSource(func() time.Time { return time.Now() })
 
 	executionResult := &actionResult{
+		logger: logger,
 		Context: &jsContext{
 			data: map[string]interface{}{},
 		},
