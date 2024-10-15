@@ -64,6 +64,7 @@ type (
 		StartedAt          time.Time     `json:"started_at"`
 		ExecutionDuration  time.Duration `json:"execution_duration"`
 		HasRunToCompletion bool          `json:"has_run_to_completion"`
+		IsSkipped          bool          `json:"is_skipped"`
 	}
 	ExecutionResult interface {
 		ExecutionMetadata() ExecutionMetadata
