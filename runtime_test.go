@@ -14,12 +14,18 @@ import (
 	registry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
+const testContextValue contextValue = "contextValue"
+
+type contextValue string
+
 func Test_GojaPrecompiledRuntime(t *testing.T) {
 	runner := getGojaRunner()
 
 	for i := 0; i < 2; i++ {
 
-		result, err := runner.Execute(context.Background(), registry.WorkflowDescriptor{
+		workflowRuncontext := context.WithValue(context.Background(), testContextValue, "test"+fmt.Sprint(i))
+
+		result, err := runner.Execute(workflowRuncontext, registry.WorkflowDescriptor{
 			Limits: registry.RuntimeLimits{
 				MaxExecutionDuration: 30 * time.Second,
 			},
@@ -86,7 +92,8 @@ func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Asserti
 	return func(t *testing.T) {
 		runner := getGojaRunner()
 		logger := testLogger{}
-		result, err := runner.Execute(context.Background(), registry.WorkflowDescriptor{
+		workflowRuncontext := context.WithValue(context.Background(), testContextValue, "test")
+		result, err := runner.Execute(workflowRuncontext, registry.WorkflowDescriptor{
 			Limits: registry.RuntimeLimits{
 				MaxExecutionDuration: 30 * time.Second,
 			},
@@ -118,15 +125,27 @@ func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Asserti
 	}
 }
 
+var contextRead = 0
+
 func getGojaRunner() registry.Runner {
 	runtime, _ := GetRuntime("goja")
 
 	kindeAPI := gojaRuntime.RegisterNativeAPI("kinde")
-	kindeAPI.RegisterNativeFunction("fetch", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeFunction("fetch", func(ctx context.Context, binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
 		return "fetch response", nil
 	})
 
-	kindeAPI.RegisterNativeAPI("idToken").RegisterNativeFunction("setCustomClaim", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeAPI("idToken").RegisterNativeFunction("setCustomClaim", func(ctx context.Context, binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+
+		testValue, ok := ctx.Value(testContextValue).(string)
+		if !ok {
+			return nil, fmt.Errorf("context value not found")
+		}
+		if testValue != "test"+fmt.Sprint(contextRead) && testValue != "test" {
+			return nil, fmt.Errorf("context value not as expected")
+		}
+		contextRead++
+
 		if len(args) != 2 {
 			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
 		}
@@ -138,7 +157,8 @@ func getGojaRunner() registry.Runner {
 		return nil, nil
 	})
 
-	kindeAPI.RegisterNativeAPI("accessToken").RegisterNativeFunction("setCustomClaim", func(binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+	kindeAPI.RegisterNativeAPI("accessToken").RegisterNativeFunction("setCustomClaim", func(ctx context.Context, binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+
 		if len(args) != 2 {
 			return nil, fmt.Errorf("expected 2 arguments, got %d", len(args))
 		}

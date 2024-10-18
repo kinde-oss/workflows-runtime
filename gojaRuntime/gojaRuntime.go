@@ -177,12 +177,12 @@ func newGojaRunner() runtimesRegistry.Runner {
 	return &runner
 }
 
-func (nm *NativeModule) setupModuleForVM(vm *goja.Runtime, actionResult *actionResult, parent *goja.Object, requestedName string, binding runtimesRegistry.BindingSettings) {
+func (nm *NativeModule) setupModuleForVM(ctx context.Context, vm *goja.Runtime, actionResult *actionResult, parent *goja.Object, requestedName string, binding runtimesRegistry.BindingSettings) {
 	for _, name := range strings.Split(requestedName, ".")[:1] {
 		if function, ok := nm.functions[name]; ok {
 			wrappedFunc := func(binding runtimesRegistry.BindingSettings, jsContext jsContext) func(args ...interface{}) (interface{}, error) {
 				return func(args ...interface{}) (interface{}, error) {
-					return function(binding, jsContext, args...)
+					return function(ctx, binding, jsContext, args...)
 				}
 			}
 			parent.Set(name, vm.ToValue(wrappedFunc(binding, *actionResult.Context)))
@@ -193,7 +193,7 @@ func (nm *NativeModule) setupModuleForVM(vm *goja.Runtime, actionResult *actionR
 
 				wrappedFunc := func(binding runtimesRegistry.BindingSettings, jsContext jsContext) func(args ...interface{}) (interface{}, error) {
 					return func(args ...interface{}) (interface{}, error) {
-						return function(binding, jsContext, args...)
+						return function(ctx, binding, jsContext, args...)
 					}
 				}
 
@@ -205,12 +205,12 @@ func (nm *NativeModule) setupModuleForVM(vm *goja.Runtime, actionResult *actionR
 		if module, ok := nm.modules[name]; ok {
 			registeredModule := vm.NewObject()
 			parent.Set(name, registeredModule)
-			module.setupModuleForVM(vm, actionResult, registeredModule, strings.Join(strings.Split(requestedName, ".")[1:], "."), binding)
+			module.setupModuleForVM(ctx, vm, actionResult, registeredModule, strings.Join(strings.Split(requestedName, ".")[1:], "."), binding)
 		}
 	}
 }
 
-func (nm *nativeModules) setupModuleForVM(vm *goja.Runtime, actionResult *actionResult, requestedName string, binding runtimesRegistry.BindingSettings) {
+func (nm *nativeModules) setupModuleForVM(ctx context.Context, vm *goja.Runtime, actionResult *actionResult, requestedName string, binding runtimesRegistry.BindingSettings) {
 
 	for _, name := range strings.Split(requestedName, ".")[:1] {
 		if module, ok := nm.registered[name]; ok {
@@ -219,21 +219,21 @@ func (nm *nativeModules) setupModuleForVM(vm *goja.Runtime, actionResult *action
 				registeredModule = vm.NewObject()
 				vm.Set(name, registeredModule)
 			}
-			module.setupModuleForVM(vm, actionResult, registeredModule.(*goja.Object), strings.Join(strings.Split(requestedName, ".")[1:], "."), binding)
+			module.setupModuleForVM(ctx, vm, actionResult, registeredModule.(*goja.Object), strings.Join(strings.Split(requestedName, ".")[1:], "."), binding)
 		}
 	}
 
 }
 
 type NativeModule struct {
-	functions map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)
+	functions map[string]func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)
 	modules   map[string]*NativeModule
 	name      string
 }
 
 func RegisterNativeAPI(name string) *NativeModule {
 	result := &NativeModule{
-		functions: map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
+		functions: map[string]func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
 		modules:   map[string]*NativeModule{},
 		name:      name,
 	}
@@ -241,14 +241,14 @@ func RegisterNativeAPI(name string) *NativeModule {
 	return result
 }
 
-func (module *NativeModule) RegisterNativeFunction(name string, fn func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)) {
+func (module *NativeModule) RegisterNativeFunction(name string, fn func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)) {
 
 	module.functions[name] = fn
 }
 
 func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
 	result := &NativeModule{
-		functions: map[string]func(binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
+		functions: map[string]func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
 		modules:   map[string]*NativeModule{},
 		name:      name,
 	}
@@ -379,7 +379,7 @@ func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workf
 	}
 
 	for requestedName, requestedBinding := range workflow.RequestedBindings {
-		runner.nativeModules.setupModuleForVM(vm, executionResult, requestedName, requestedBinding)
+		runner.nativeModules.setupModuleForVM(ctx, vm, executionResult, requestedName, requestedBinding)
 	}
 
 	if vm.Get("module") == nil { //esModules prerequisite
