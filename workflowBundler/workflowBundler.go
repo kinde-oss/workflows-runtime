@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	FailurePolicyActionStop     FailurePolicyAction = "stop"
-	FailurePolicyActionContinue FailurePolicyAction = "continue"
+	PolicyActionStop     PolicyAction = "stop"
+	PolicyActionContinue PolicyAction = "continue"
 )
 
 type (
-	FailurePolicyAction string
-	FailurePolicy       struct {
-		Action FailurePolicyAction `json:"action"`
+	PolicyAction  string
+	FailurePolicy struct {
+		Action PolicyAction `json:"action"`
 	}
 
 	WorkflowSettings struct {
@@ -55,9 +55,9 @@ type (
 	}
 )
 
-func (a FailurePolicyAction) IsValid() bool {
+func (a PolicyAction) IsValid() bool {
 	switch a {
-	case FailurePolicyActionStop, FailurePolicyActionContinue:
+	case PolicyActionStop, PolicyActionContinue:
 		return true
 	}
 	return false
@@ -177,13 +177,13 @@ func (br *BundlerResult) discoverSettings(exportName string, source []byte) Work
 			br.addError(errors.New("failed to determine failure policy"))
 		}
 
-		if !FailurePolicyAction(failurePolicy.Action).IsValid() {
+		if !PolicyAction(failurePolicy.Action).IsValid() {
 			br.addError(errors.New("invalid failure policy action"))
 			failurePolicy = FailurePolicy{}
 		}
 	} else {
 		failurePolicy = FailurePolicy{
-			Action: FailurePolicyActionStop,
+			Action: PolicyActionStop,
 		}
 	}
 
