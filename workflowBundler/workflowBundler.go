@@ -181,6 +181,10 @@ func (br *BundlerResult) discoverSettings(exportName string, source []byte) Work
 			br.addError(errors.New("invalid failure policy action"))
 			failurePolicy = FailurePolicy{}
 		}
+	} else {
+		failurePolicy = FailurePolicy{
+			Action: FailurePolicyActionStop,
+		}
 	}
 
 	return WorkflowSettings{
