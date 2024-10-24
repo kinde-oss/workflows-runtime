@@ -17,8 +17,8 @@ const (
 )
 
 type (
-	PolicyAction  string
-	FailurePolicy struct {
+	PolicyAction string
+	ResultPolicy struct {
 		Action PolicyAction `json:"action"`
 	}
 
@@ -26,7 +26,7 @@ type (
 		ID            string                                      `json:"id"`
 		Other         map[string]interface{}                      `json:"other"`
 		Bindings      map[string]runtimesRegistry.BindingSettings `json:"bindings"`
-		FailurePolicy FailurePolicy                               `json:"failure_policy"`
+		FailurePolicy ResultPolicy                                `json:"failure_policy"`
 	}
 	BundledContent struct {
 		Source     []byte           `json:"source"`
@@ -166,7 +166,7 @@ func (br *BundlerResult) discoverSettings(exportName string, source []byte) Work
 		}
 	}
 
-	var failurePolicy FailurePolicy
+	var failurePolicy ResultPolicy
 	if policy, ok := settings.ValueAsMap()["failurePolicy"]; ok {
 		jsonData, err := json.Marshal(policy)
 		if err != nil {
@@ -179,10 +179,10 @@ func (br *BundlerResult) discoverSettings(exportName string, source []byte) Work
 
 		if !PolicyAction(failurePolicy.Action).IsValid() {
 			br.addError(errors.New("invalid failure policy action"))
-			failurePolicy = FailurePolicy{}
+			failurePolicy = ResultPolicy{}
 		}
 	} else {
-		failurePolicy = FailurePolicy{
+		failurePolicy = ResultPolicy{
 			Action: PolicyActionStop,
 		}
 	}
