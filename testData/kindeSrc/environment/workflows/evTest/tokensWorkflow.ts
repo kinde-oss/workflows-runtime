@@ -3,6 +3,9 @@ import {hello} from "./hello"
 export const workflowSettings = {
     id: 'tokenGen',
     trigger: 'onTokenGeneration',
+    failurePolicy:{
+        "action": "stop"
+    },
     bindings:{
         "console": {},
         "kinde.fetch": {},
