@@ -163,9 +163,12 @@ func init() {
 	registry.RegisterNativeModule("url", urlModule.Require)
 }
 
-var __nativeModules = nativeModules{
-	registered: map[string]*NativeModule{},
-}
+var (
+	__nativeModules = nativeModules{
+		registered: map[string]*NativeModule{},
+	}
+	__afterVmSetupFunc = func(ctx context.Context, vm *goja.Runtime) {}
+)
 
 func newGojaRunner() runtimesRegistry.Runner {
 	runner := GojaRunnerV1{
@@ -241,6 +244,12 @@ func RegisterNativeAPI(name string) *NativeModule {
 	return result
 }
 
+func AfterVMSetupFunc(afterVmSetup func(ctx context.Context, vm *goja.Runtime)) {
+	if afterVmSetup != nil {
+		__afterVmSetupFunc = afterVmSetup
+	}
+}
+
 func (module *NativeModule) RegisterNativeFunction(name string, fn func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)) {
 
 	module.functions[name] = fn
@@ -260,6 +269,7 @@ func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
 func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
 	_, returnErr := e.setupVM(ctx, vm, workflow, options.Logger)
+	__afterVmSetupFunc(ctx, vm)
 
 	if returnErr != nil {
 		return nil, returnErr
@@ -288,6 +298,7 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 
 	vm := goja.New()
 	executionResult, returnErr := e.setupVM(ctx, vm, workflow, startOptions.Loggger)
+	__afterVmSetupFunc(ctx, vm)
 
 	defer func(startedAt time.Time) {
 		executionResult.RunMetadata.ExecutionDuration = time.Since(startedAt)
@@ -298,7 +309,11 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	}
 
 	module := vm.Get("module").ToObject(vm)
-	exports := module.Get("exports").ToObject(vm)
+	exportsJs := module.Get("exports")
+	if exportsJs == nil {
+		return nil, fmt.Errorf("no exports found")
+	}
+	exports := exportsJs.ToObject(vm)
 
 	defaultExport := exports.Get("default")
 	if defaultExport == nil {
