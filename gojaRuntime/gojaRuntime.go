@@ -228,12 +228,14 @@ func (nm *nativeModules) setupModuleForVM(ctx context.Context, vm *goja.Runtime,
 
 }
 
+// NativeModule represents a native module that can be registered and used in the runtime.
 type NativeModule struct {
 	functions map[string]func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)
 	modules   map[string]*NativeModule
 	name      string
 }
 
+// RegisterNativeAPI registers a new native API which could be bound to and used at run-time.
 func RegisterNativeAPI(name string) *NativeModule {
 	result := &NativeModule{
 		functions: map[string]func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
@@ -244,17 +246,20 @@ func RegisterNativeAPI(name string) *NativeModule {
 	return result
 }
 
+// AfterVMSetupFunc allows to set a function that will be called after the VM is setup.
 func AfterVMSetupFunc(afterVmSetup func(ctx context.Context, vm *goja.Runtime)) {
 	if afterVmSetup != nil {
 		__afterVmSetupFunc = afterVmSetup
 	}
 }
 
+// RegisterNativeFunction registers a new native function which could be bound to and used at run-time.
 func (module *NativeModule) RegisterNativeFunction(name string, fn func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)) {
 
 	module.functions[name] = fn
 }
 
+// RegisterNativeAPI registers a new native API which could be bound to and used at run-time.
 func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
 	result := &NativeModule{
 		functions: map[string]func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error){},
@@ -265,7 +270,6 @@ func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
 	return result
 }
 
-// Introspect implements runtime_registry.Runner.
 func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
 	_, returnErr := e.setupVM(ctx, vm, workflow, options.Logger)
