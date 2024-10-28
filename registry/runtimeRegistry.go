@@ -88,7 +88,9 @@ type (
 	}
 
 	Runner interface {
+		// Execute the workflow
 		Execute(ctx context.Context, workflow WorkflowDescriptor, startOptions StartOptions) (ExecutionResult, error)
+		// Introspect the workflow for exports without executing it
 		Introspect(ctx context.Context, workflow WorkflowDescriptor, options IntrospectionOptions) (IntrospectionResult, error)
 	}
 )

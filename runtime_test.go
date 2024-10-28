@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 
 	gojaRuntime "github.com/kinde-oss/workflows-runtime/gojaRuntime"
@@ -17,6 +18,16 @@ import (
 const testContextValue contextValue = "contextValue"
 
 type contextValue string
+
+func Test_GojaLogVmInit(t *testing.T) {
+	setupWasCalled := false
+	gojaRuntime.AfterVMSetupFunc(func(ctx context.Context, vm *goja.Runtime) {
+		setupWasCalled = true
+	})
+	runner := getGojaRunner()
+	runner.Execute(context.Background(), registry.WorkflowDescriptor{}, registry.StartOptions{})
+	assert.True(t, setupWasCalled)
+}
 
 func Test_GojaPrecompiledRuntime(t *testing.T) {
 	runner := getGojaRunner()
