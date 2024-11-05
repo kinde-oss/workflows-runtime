@@ -172,7 +172,8 @@ var (
 	__nativeModules = nativeModules{
 		registered: map[string]*NativeModule{},
 	}
-	__afterVmSetupFunc = func(ctx context.Context, vm *goja.Runtime) {}
+	__afterVmSetupFunc  = func(ctx context.Context, vm *goja.Runtime) {}
+	__beforeVmSetupFunc = func(ctx context.Context, vm *goja.Runtime) context.Context { return ctx }
 )
 
 func newGojaRunner() runtimesRegistry.Runner {
@@ -258,6 +259,13 @@ func AfterVMSetupFunc(afterVmSetup func(ctx context.Context, vm *goja.Runtime)) 
 	}
 }
 
+// BeforeVMSetupFunc allows to set a function that will be called before the VM is setup.
+func BeforeVMSetupFunc(beforeVmSetup func(ctx context.Context, vm *goja.Runtime) context.Context) {
+	if beforeVmSetup != nil {
+		__beforeVmSetupFunc = beforeVmSetup
+	}
+}
+
 // RegisterNativeFunction registers a new native function which could be bound to and used at run-time.
 func (module *NativeModule) RegisterNativeFunction(name string, fn func(ctx context.Context, binding runtimesRegistry.BindingSettings, jsContext JsContext, args ...interface{}) (interface{}, error)) {
 
@@ -277,6 +285,7 @@ func (module *NativeModule) RegisterNativeAPI(name string) *NativeModule {
 
 func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, options runtimesRegistry.IntrospectionOptions) (runtimesRegistry.IntrospectionResult, error) {
 	vm := goja.New()
+	ctx = __beforeVmSetupFunc(ctx, vm)
 	_, returnErr := e.setupVM(ctx, vm, workflow, options.Logger)
 	__afterVmSetupFunc(ctx, vm)
 
@@ -306,16 +315,17 @@ func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry
 func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.WorkflowDescriptor, startOptions runtimesRegistry.StartOptions) (runtimesRegistry.ExecutionResult, error) {
 
 	vm := goja.New()
+	ctx = __beforeVmSetupFunc(ctx, vm)
 	executionResult, returnErr := e.setupVM(ctx, vm, workflow, startOptions.Loggger)
 	__afterVmSetupFunc(ctx, vm)
-
-	defer func(startedAt time.Time) {
-		executionResult.RunMetadata.ExecutionDuration = time.Since(startedAt)
-	}(executionResult.RunMetadata.StartedAt)
 
 	if returnErr != nil {
 		return executionResult, returnErr
 	}
+
+	defer func(startedAt time.Time) {
+		executionResult.RunMetadata.ExecutionDuration = time.Since(startedAt)
+	}(executionResult.RunMetadata.StartedAt)
 
 	module := vm.Get("module").ToObject(vm)
 	exportsJs := module.Get("exports")

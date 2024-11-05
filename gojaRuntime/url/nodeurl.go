@@ -5,12 +5,12 @@ import (
 	"strings"
 )
 
-type searchParam struct {
-	name  string
-	value string
+type SearchParam struct {
+	Name  string
+	Value string
 }
 
-func (sp *searchParam) Encode() string {
+func (sp *SearchParam) Encode() string {
 	return sp.string(true)
 }
 
@@ -18,29 +18,29 @@ func escapeSearchParam(s string) string {
 	return escape(s, &tblEscapeURLQueryParam, true)
 }
 
-func (sp *searchParam) string(encode bool) string {
+func (sp *SearchParam) string(encode bool) string {
 	if encode {
-		return escapeSearchParam(sp.name) + "=" + escapeSearchParam(sp.value)
+		return escapeSearchParam(sp.Name) + "=" + escapeSearchParam(sp.Value)
 	} else {
-		return sp.name + "=" + sp.value
+		return sp.Name + "=" + sp.Value
 	}
 }
 
-type searchParams []searchParam
+type SearchParams []SearchParam
 
-func (s searchParams) Len() int {
+func (s SearchParams) Len() int {
 	return len(s)
 }
 
-func (s searchParams) Swap(i, j int) {
+func (s SearchParams) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s searchParams) Less(i, j int) bool {
-	return strings.Compare(s[i].name, s[j].name) < 0
+func (s SearchParams) Less(i, j int) bool {
+	return strings.Compare(s[i].Name, s[j].Name) < 0
 }
 
-func (s searchParams) Encode() string {
+func (s SearchParams) Encode() string {
 	var sb strings.Builder
 	for i, v := range s {
 		if i > 0 {
@@ -51,7 +51,7 @@ func (s searchParams) Encode() string {
 	return sb.String()
 }
 
-func (s searchParams) String() string {
+func (s SearchParams) String() string {
 	var sb strings.Builder
 	for i, v := range s {
 		if i > 0 {
@@ -63,68 +63,68 @@ func (s searchParams) String() string {
 }
 
 type nodeURL struct {
-	url          *url.URL
-	searchParams searchParams
+	Url          *url.URL
+	SearchParams SearchParams
 }
 
-type urlSearchParams nodeURL
+type UrlSearchParams nodeURL
 
 // This methods ensures that the url.URL has the proper RawQuery based on the searchParam
 // structs. If a change is made to the searchParams we need to keep them in sync.
 func (nu *nodeURL) syncSearchParams() {
 	if nu.rawQueryUpdateNeeded() {
-		nu.url.RawQuery = nu.searchParams.Encode()
+		nu.Url.RawQuery = nu.SearchParams.Encode()
 	}
 }
 
 func (nu *nodeURL) rawQueryUpdateNeeded() bool {
-	return len(nu.searchParams) > 0 && nu.url.RawQuery == ""
+	return len(nu.SearchParams) > 0 && nu.Url.RawQuery == ""
 }
 
 func (nu *nodeURL) String() string {
-	return nu.url.String()
+	return nu.Url.String()
 }
 
-func (sp *urlSearchParams) hasName(name string) bool {
-	for _, v := range sp.searchParams {
-		if v.name == name {
+func (sp *UrlSearchParams) hasName(name string) bool {
+	for _, v := range sp.SearchParams {
+		if v.Name == name {
 			return true
 		}
 	}
 	return false
 }
 
-func (sp *urlSearchParams) hasValue(name, value string) bool {
-	for _, v := range sp.searchParams {
-		if v.name == name && v.value == value {
+func (sp *UrlSearchParams) hasValue(name, value string) bool {
+	for _, v := range sp.SearchParams {
+		if v.Name == name && v.Value == value {
 			return true
 		}
 	}
 	return false
 }
 
-func (sp *urlSearchParams) getValues(name string) []string {
-	vals := make([]string, 0, len(sp.searchParams))
-	for _, v := range sp.searchParams {
-		if v.name == name {
-			vals = append(vals, v.value)
+func (sp *UrlSearchParams) getValues(name string) []string {
+	vals := make([]string, 0, len(sp.SearchParams))
+	for _, v := range sp.SearchParams {
+		if v.Name == name {
+			vals = append(vals, v.Value)
 		}
 	}
 
 	return vals
 }
 
-func (sp *urlSearchParams) getFirstValue(name string) (string, bool) {
-	for _, v := range sp.searchParams {
-		if v.name == name {
-			return v.value, true
+func (sp *UrlSearchParams) getFirstValue(name string) (string, bool) {
+	for _, v := range sp.SearchParams {
+		if v.Name == name {
+			return v.Value, true
 		}
 	}
 
 	return "", false
 }
 
-func parseSearchQuery(query string) (ret searchParams) {
+func parseSearchQuery(query string) (ret SearchParams) {
 	if query == "" {
 		return
 	}
@@ -138,9 +138,9 @@ func parseSearchQuery(query string) (ret searchParams) {
 		pair := strings.SplitN(v, "=", 2)
 		l := len(pair)
 		if l == 1 {
-			ret = append(ret, searchParam{name: unescapeSearchParam(pair[0]), value: ""})
+			ret = append(ret, SearchParam{Name: unescapeSearchParam(pair[0]), Value: ""})
 		} else if l == 2 {
-			ret = append(ret, searchParam{name: unescapeSearchParam(pair[0]), value: unescapeSearchParam(pair[1])})
+			ret = append(ret, SearchParam{Name: unescapeSearchParam(pair[0]), Value: unescapeSearchParam(pair[1])})
 		}
 	}
 
