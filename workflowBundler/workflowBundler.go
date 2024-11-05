@@ -32,6 +32,7 @@ type (
 		WorkingFolder       string
 		EntryPoints         []string
 		IntrospectionExport string
+		Plugins             []api.Plugin
 	}
 
 	WorkflowBundler interface {
@@ -75,6 +76,7 @@ func (b *builder) Bundle() BundlerResult {
 		MinifyWhitespace: true,
 		MinifySyntax:     true,
 		Outdir:           "output",
+		Plugins:          b.bundleOptions.Plugins,
 	}
 	tr := api.Build(opts)
 
