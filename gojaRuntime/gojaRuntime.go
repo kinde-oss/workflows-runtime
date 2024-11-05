@@ -10,6 +10,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/kinde-oss/workflows-runtime/gojaRuntime/require"
 	urlModule "github.com/kinde-oss/workflows-runtime/gojaRuntime/url"
+	"github.com/kinde-oss/workflows-runtime/gojaRuntime/util"
 	runtimesRegistry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
@@ -150,8 +151,12 @@ var builtInModules = map[string]func(e *GojaRunnerV1, vm *goja.Runtime, mounting
 		consoleMountingPoint := vm.Get("console").(*goja.Object)
 		runner.consoleEmulation(vm, consoleMountingPoint, result, binding)
 	},
-	"url": func(e *GojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, _ *actionResult, _ runtimesRegistry.BindingSettings) {
-		vm.Set("url", require.Require(vm, "url"))
+	"url": func(e *GojaRunnerV1, vm *goja.Runtime, _ *goja.Object, _ *actionResult, _ runtimesRegistry.BindingSettings) {
+		urlModule.Enable(vm)
+	},
+	"util": func(e *GojaRunnerV1, vm *goja.Runtime, _ *goja.Object, _ *actionResult, _ runtimesRegistry.BindingSettings) {
+		module := require.Require(vm, util.ModuleName).ToObject(vm)
+		vm.Set("util", module)
 	},
 	"module": func(e *GojaRunnerV1, vm *goja.Runtime, mountingPoint *goja.Object, _ *actionResult, _ runtimesRegistry.BindingSettings) {
 		vm.Set("module", vm.NewObject())
