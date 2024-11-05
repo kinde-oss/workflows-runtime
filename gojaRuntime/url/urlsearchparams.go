@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	reflectTypeURLSearchParams         = reflect.TypeOf((*urlSearchParams)(nil))
+	reflectTypeURLSearchParams         = reflect.TypeOf((*UrlSearchParams)(nil))
 	reflectTypeURLSearchParamsIterator = reflect.TypeOf((*urlSearchParamsIterator)(nil))
 )
 
@@ -26,16 +26,16 @@ func newInvalidArgsError(r *goja.Runtime) *goja.Object {
 	return errors.NewTypeError(r, "ERR_INVALID_ARG_TYPE", `The "callback" argument must be of type function.`)
 }
 
-func toUrlSearchParams(r *goja.Runtime, v goja.Value) *urlSearchParams {
+func toUrlSearchParams(r *goja.Runtime, v goja.Value) *UrlSearchParams {
 	if v.ExportType() == reflectTypeURLSearchParams {
-		if u := v.Export().(*urlSearchParams); u != nil {
+		if u := v.Export().(*UrlSearchParams); u != nil {
 			return u
 		}
 	}
 	panic(errors.NewTypeError(r, errors.ErrCodeInvalidThis, `Value of "this" must be of type URLSearchParams`))
 }
 
-func (m *urlModule) newURLSearchParams(sp *urlSearchParams) *goja.Object {
+func (m *urlModule) newURLSearchParams(sp *UrlSearchParams) *goja.Object {
 	v := m.r.ToValue(sp).(*goja.Object)
 	v.SetPrototype(m.URLSearchParamsPrototype)
 	return v
@@ -43,7 +43,7 @@ func (m *urlModule) newURLSearchParams(sp *urlSearchParams) *goja.Object {
 
 func (m *urlModule) createURLSearchParamsConstructor() goja.Value {
 	f := m.r.ToValue(func(call goja.ConstructorCall) *goja.Object {
-		var sp searchParams
+		var sp SearchParams
 		v := call.Argument(0)
 		if o, ok := v.(*goja.Object); ok {
 			sp = m.buildParamsFromObject(o)
@@ -51,7 +51,7 @@ func (m *urlModule) createURLSearchParamsConstructor() goja.Value {
 			sp = parseSearchQuery(v.String())
 		}
 
-		return m.newURLSearchParams(&urlSearchParams{searchParams: sp})
+		return m.newURLSearchParams(&UrlSearchParams{SearchParams: sp})
 	}).(*goja.Object)
 
 	m.URLSearchParamsPrototype = m.createURLSearchParamsPrototype()
@@ -61,8 +61,8 @@ func (m *urlModule) createURLSearchParamsConstructor() goja.Value {
 	return f
 }
 
-func (m *urlModule) buildParamsFromObject(o *goja.Object) searchParams {
-	var query searchParams
+func (m *urlModule) buildParamsFromObject(o *goja.Object) SearchParams {
+	var query SearchParams
 
 	if o.GetSymbol(goja.SymIterator) != nil {
 		return m.buildParamsFromIterable(o)
@@ -70,14 +70,14 @@ func (m *urlModule) buildParamsFromObject(o *goja.Object) searchParams {
 
 	for _, k := range o.Keys() {
 		val := o.Get(k).String()
-		query = append(query, searchParam{name: k, value: val})
+		query = append(query, SearchParam{Name: k, Value: val})
 	}
 
 	return query
 }
 
-func (m *urlModule) buildParamsFromIterable(o *goja.Object) searchParams {
-	var query searchParams
+func (m *urlModule) buildParamsFromIterable(o *goja.Object) SearchParams {
+	var query SearchParams
 
 	m.r.ForOf(o, func(val goja.Value) bool {
 		obj := val.ToObject(m.r)
@@ -104,9 +104,9 @@ func (m *urlModule) buildParamsFromIterable(o *goja.Object) searchParams {
 			panic(newInvalidTupleError(m.r))
 		}
 
-		query = append(query, searchParam{
-			name:  name,
-			value: value,
+		query = append(query, SearchParam{
+			Name:  name,
+			Value: value,
 		})
 
 		return true
@@ -124,9 +124,9 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 		}
 
 		u := toUrlSearchParams(m.r, call.This)
-		u.searchParams = append(u.searchParams, searchParam{
-			name:  call.Argument(0).String(),
-			value: call.Argument(1).String(),
+		u.SearchParams = append(u.SearchParams, SearchParam{
+			Name:  call.Argument(0).String(),
+			Value: call.Argument(1).String(),
 		})
 		u.markUpdated()
 
@@ -141,12 +141,12 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 		}
 
 		name := call.Argument(0).String()
-		isValid := func(v searchParam) bool {
+		isValid := func(v SearchParam) bool {
 			if len(call.Arguments) == 1 {
-				return v.name != name
-			} else if v.name == name {
+				return v.Name != name
+			} else if v.Name == name {
 				arg := call.Argument(1)
-				if !goja.IsUndefined(arg) && v.value == arg.String() {
+				if !goja.IsUndefined(arg) && v.Value == arg.String() {
 					return false
 				}
 			}
@@ -154,15 +154,15 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 		}
 
 		j := 0
-		for i, v := range u.searchParams {
+		for i, v := range u.SearchParams {
 			if isValid(v) {
 				if i != j {
-					u.searchParams[j] = v
+					u.SearchParams[j] = v
 				}
 				j++
 			}
 		}
-		u.searchParams = u.searchParams[:j]
+		u.SearchParams = u.SearchParams[:j]
 		u.markUpdated()
 
 		return goja.Undefined()
@@ -182,12 +182,12 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 		}
 
 		if fn, ok := goja.AssertFunction(call.Argument(0)); ok {
-			for _, pair := range u.searchParams {
+			for _, pair := range u.SearchParams {
 				// name, value, searchParams
 				_, err := fn(
 					nil,
-					m.r.ToValue(pair.name),
-					m.r.ToValue(pair.value),
+					m.r.ToValue(pair.Name),
+					m.r.ToValue(pair.Value),
 					call.This,
 				)
 
@@ -259,28 +259,28 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 		name := call.Argument(0).String()
 		found := false
 		j := 0
-		for i, sp := range u.searchParams {
-			if sp.name == name {
+		for i, sp := range u.SearchParams {
+			if sp.Name == name {
 				if found {
 					continue // Remove all values
 				}
 
-				u.searchParams[i].value = call.Argument(1).String()
+				u.SearchParams[i].Value = call.Argument(1).String()
 				found = true
 			}
 			if i != j {
-				u.searchParams[j] = sp
+				u.SearchParams[j] = sp
 			}
 			j++
 		}
 
 		if !found {
-			u.searchParams = append(u.searchParams, searchParam{
-				name:  name,
-				value: call.Argument(1).String(),
+			u.SearchParams = append(u.SearchParams, SearchParam{
+				Name:  name,
+				Value: call.Argument(1).String(),
 			})
 		} else {
-			u.searchParams = u.searchParams[:j]
+			u.SearchParams = u.SearchParams[:j]
 		}
 
 		u.markUpdated()
@@ -290,19 +290,19 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 
 	p.Set("sort", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toUrlSearchParams(m.r, call.This)
-		sort.Stable(u.searchParams)
+		sort.Stable(u.SearchParams)
 		u.markUpdated()
 		return goja.Undefined()
 	}))
 
 	p.DefineAccessorProperty("size", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toUrlSearchParams(m.r, call.This)
-		return m.r.ToValue(len(u.searchParams))
+		return m.r.ToValue(len(u.SearchParams))
 	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
 
 	p.Set("toString", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toUrlSearchParams(m.r, call.This)
-		str := u.searchParams.Encode()
+		str := u.SearchParams.Encode()
 		return m.r.ToValue(str)
 	}))
 
@@ -313,9 +313,9 @@ func (m *urlModule) createURLSearchParamsPrototype() *goja.Object {
 	return p
 }
 
-func (sp *urlSearchParams) markUpdated() {
-	if sp.url != nil && sp.url.RawQuery != "" {
-		sp.url.RawQuery = ""
+func (sp *UrlSearchParams) markUpdated() {
+	if sp.Url != nil && sp.Url.RawQuery != "" {
+		sp.Url.RawQuery = ""
 	}
 }
 
@@ -329,7 +329,7 @@ const (
 
 type urlSearchParamsIterator struct {
 	typ urlSearchParamsIteratorType
-	sp  *urlSearchParams
+	sp  *UrlSearchParams
 	idx int
 }
 
@@ -353,15 +353,15 @@ func (m *urlModule) getURLSearchParamsIteratorPrototype() *goja.Object {
 	p.Set("next", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		it := toURLSearchParamsIterator(m.r, call.This)
 		res := m.r.NewObject()
-		if it.idx < len(it.sp.searchParams) {
-			param := it.sp.searchParams[it.idx]
+		if it.idx < len(it.sp.SearchParams) {
+			param := it.sp.SearchParams[it.idx]
 			switch it.typ {
 			case urlSearchParamsIteratorKeys:
-				res.Set("value", param.name)
+				res.Set("value", param.Name)
 			case urlSearchParamsIteratorValues:
-				res.Set("value", param.value)
+				res.Set("value", param.Value)
 			default:
-				res.Set("value", m.r.NewArray(param.name, param.value))
+				res.Set("value", m.r.NewArray(param.Name, param.Value))
 			}
 			res.Set("done", false)
 			it.idx++
@@ -378,7 +378,7 @@ func (m *urlModule) getURLSearchParamsIteratorPrototype() *goja.Object {
 	return p
 }
 
-func (m *urlModule) newURLSearchParamsIterator(sp *urlSearchParams, typ urlSearchParamsIteratorType) goja.Value {
+func (m *urlModule) newURLSearchParamsIterator(sp *UrlSearchParams, typ urlSearchParamsIteratorType) goja.Value {
 	it := m.r.ToValue(&urlSearchParamsIterator{
 		typ: typ,
 		sp:  sp,

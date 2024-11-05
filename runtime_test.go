@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	gojaRuntime "github.com/kinde-oss/workflows-runtime/gojaRuntime"
+	url "github.com/kinde-oss/workflows-runtime/gojaRuntime/url"
 	projectBundler "github.com/kinde-oss/workflows-runtime/projectBundler"
 	registry "github.com/kinde-oss/workflows-runtime/registry"
 )
@@ -19,14 +20,66 @@ const testContextValue contextValue = "contextValue"
 
 type contextValue string
 
-func Test_GojaLogVmInit(t *testing.T) {
+func Test_GojaLogVmInits(t *testing.T) {
 	setupWasCalled := false
+	gojaRuntime.BeforeVMSetupFunc(func(ctx context.Context, vm *goja.Runtime) context.Context {
+		return context.WithValue(ctx, testContextValue, vm)
+	})
 	gojaRuntime.AfterVMSetupFunc(func(ctx context.Context, vm *goja.Runtime) {
 		setupWasCalled = true
 	})
+
+	gojaRuntime.RegisterNativeAPI("test").RegisterNativeFunction("test2", func(ctx context.Context, binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
+		if ctx.Value(testContextValue) == nil {
+			panic("test context value not found")
+		}
+
+		searchParams := args[0].(*url.UrlSearchParams)
+		if (searchParams.SearchParams[0] != url.SearchParam{Name: "grant_type", Value: "client_credentials"}) {
+			panic("search params not as expected")
+		}
+		if (searchParams.SearchParams[1] != url.SearchParam{Name: "client_id", Value: "123"}) {
+			panic("search params not as expected")
+		}
+		if (searchParams.SearchParams[2] != url.SearchParam{Name: "client_secret", Value: "456"}) {
+			panic("search params not as expected")
+		}
+
+		return nil, nil
+	})
+
 	runner := getGojaRunner()
-	runner.Execute(context.Background(), registry.WorkflowDescriptor{}, registry.StartOptions{})
+	_, err := runner.Execute(context.Background(), registry.WorkflowDescriptor{
+		Limits: registry.RuntimeLimits{
+			MaxExecutionDuration: 30 * time.Second,
+		}, ProcessedSource: registry.SourceDescriptor{
+			Source: []byte(`
+				var r=Object.defineProperty;var a=Object.getOwnPropertyDescriptor;var s=Object.getOwnPropertyNames;var g=Object.prototype.hasOwnProperty;var f=(t,e)=>{for(var n in e)r(t,n,{get:e[n],enumerable:!0})},i=(t,e,n,l)=>{if(e&&typeof e=="object"||typeof e=="function")for(let o of s(e))!g.call(t,o)&&o!==n&&r(t,o,{get:()=>e[o],enumerable:!(l=a(e,o))||l.enumerable});return t};var u=t=>i(r({},"__esModule",{value:!0}),t);var h={};
+				f(h,{default:()=>c,workflowSettings:()=>w});module.exports=u(h);const w={resetClaims:!0};
+				var c={async handle(t){
+					return console.log("logging from workflow"), test.test2(new URLSearchParams({
+						grant_type: 'client_credentials',
+						client_id: '123',
+						client_secret: '456'
+					})
+			); }
+				};
+			`),
+			SourceType: registry.Source_ContentType_Text,
+		},
+		RequestedBindings: map[string]registry.BindingSettings{
+			"console":           {},
+			"url":               {},
+			"kinde.fetch":       {},
+			"kinde.idToken":     {},
+			"kinde.accessToken": {},
+			"test":              {},
+		},
+	}, registry.StartOptions{
+		EntryPoint: "handle",
+	})
 	assert.True(t, setupWasCalled)
+	assert.Nil(t, err)
 }
 
 func Test_GojaPrecompiledRuntime(t *testing.T) {

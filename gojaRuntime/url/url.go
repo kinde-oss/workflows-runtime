@@ -136,7 +136,7 @@ func clearURLPort(u *url.URL) {
 }
 
 func setURLPort(nu *nodeURL, v goja.Value) {
-	u := nu.url
+	u := nu.Url
 	if u.Scheme == "file" {
 		return
 	}
@@ -210,19 +210,19 @@ func (m *urlModule) createURLPrototype() *goja.Object {
 
 	// host
 	m.defineURLAccessorProp(p, "host", func(u *nodeURL) interface{} {
-		return u.url.Host
+		return u.Url.Host
 	}, func(u *nodeURL, arg goja.Value) {
 		host := arg.String()
-		if _, err := url.ParseRequestURI(u.url.Scheme + "://" + host); err == nil {
-			u.url.Host = host
-			m.fixURL(u.url)
+		if _, err := url.ParseRequestURI(u.Url.Scheme + "://" + host); err == nil {
+			u.Url.Host = host
+			m.fixURL(u.Url)
 		}
 	})
 
 	// hash
 	m.defineURLAccessorProp(p, "hash", func(u *nodeURL) interface{} {
-		if u.url.Fragment != "" {
-			return "#" + u.url.EscapedFragment()
+		if u.Url.Fragment != "" {
+			return "#" + u.Url.EscapedFragment()
 		}
 		return ""
 	}, func(u *nodeURL, arg goja.Value) {
@@ -230,24 +230,24 @@ func (m *urlModule) createURLPrototype() *goja.Object {
 		if len(h) > 0 && h[0] == '#' {
 			h = h[1:]
 		}
-		u.url.Fragment = h
+		u.Url.Fragment = h
 	})
 
 	// hostname
 	m.defineURLAccessorProp(p, "hostname", func(u *nodeURL) interface{} {
-		return strings.Split(u.url.Host, ":")[0]
+		return strings.Split(u.Url.Host, ":")[0]
 	}, func(u *nodeURL, arg goja.Value) {
 		h := arg.String()
 		if strings.IndexByte(h, ':') >= 0 {
 			return
 		}
-		if _, err := url.ParseRequestURI(u.url.Scheme + "://" + h); err == nil {
-			if port := u.url.Port(); port != "" {
-				u.url.Host = h + ":" + port
+		if _, err := url.ParseRequestURI(u.Url.Scheme + "://" + h); err == nil {
+			if port := u.Url.Port(); port != "" {
+				u.Url.Host = h + ":" + port
 			} else {
-				u.url.Host = h
+				u.Url.Host = h
 			}
-			m.fixURL(u.url)
+			m.fixURL(u.Url)
 		}
 	})
 
@@ -255,61 +255,61 @@ func (m *urlModule) createURLPrototype() *goja.Object {
 	m.defineURLAccessorProp(p, "href", func(u *nodeURL) interface{} {
 		return u.String()
 	}, func(u *nodeURL, arg goja.Value) {
-		u.url = m.parseURL(arg.String(), true)
+		u.Url = m.parseURL(arg.String(), true)
 	})
 
 	// pathname
 	m.defineURLAccessorProp(p, "pathname", func(u *nodeURL) interface{} {
-		return u.url.EscapedPath()
+		return u.Url.EscapedPath()
 	}, func(u *nodeURL, arg goja.Value) {
 		p := arg.String()
 		if _, err := url.Parse(p); err == nil {
-			switch u.url.Scheme {
+			switch u.Url.Scheme {
 			case "https", "http", "ftp", "ws", "wss":
 				if !strings.HasPrefix(p, "/") {
 					p = "/" + p
 				}
 			}
-			u.url.Path = p
+			u.Url.Path = p
 		}
 	})
 
 	// origin
 	m.defineURLAccessorProp(p, "origin", func(u *nodeURL) interface{} {
-		return u.url.Scheme + "://" + u.url.Hostname()
+		return u.Url.Scheme + "://" + u.Url.Hostname()
 	}, nil)
 
 	// password
 	m.defineURLAccessorProp(p, "password", func(u *nodeURL) interface{} {
-		p, _ := u.url.User.Password()
+		p, _ := u.Url.User.Password()
 		return p
 	}, func(u *nodeURL, arg goja.Value) {
-		user := u.url.User
-		u.url.User = url.UserPassword(user.Username(), arg.String())
+		user := u.Url.User
+		u.Url.User = url.UserPassword(user.Username(), arg.String())
 	})
 
 	// username
 	m.defineURLAccessorProp(p, "username", func(u *nodeURL) interface{} {
-		return u.url.User.Username()
+		return u.Url.User.Username()
 	}, func(u *nodeURL, arg goja.Value) {
-		p, has := u.url.User.Password()
+		p, has := u.Url.User.Password()
 		if !has {
-			u.url.User = url.User(arg.String())
+			u.Url.User = url.User(arg.String())
 		} else {
-			u.url.User = url.UserPassword(arg.String(), p)
+			u.Url.User = url.UserPassword(arg.String(), p)
 		}
 	})
 
 	// port
 	m.defineURLAccessorProp(p, "port", func(u *nodeURL) interface{} {
-		return u.url.Port()
+		return u.Url.Port()
 	}, func(u *nodeURL, arg goja.Value) {
 		setURLPort(u, arg)
 	})
 
 	// protocol
 	m.defineURLAccessorProp(p, "protocol", func(u *nodeURL) interface{} {
-		return u.url.Scheme + ":"
+		return u.Url.Scheme + ":"
 	}, func(u *nodeURL, arg goja.Value) {
 		s := arg.String()
 		pos := strings.IndexByte(s, ':')
@@ -317,9 +317,9 @@ func (m *urlModule) createURLPrototype() *goja.Object {
 			s = s[:pos]
 		}
 		s = strings.ToLower(s)
-		if isSpecialProtocol(u.url.Scheme) == isSpecialProtocol(s) {
-			if _, err := url.ParseRequestURI(s + "://" + u.url.Host); err == nil {
-				u.url.Scheme = s
+		if isSpecialProtocol(u.Url.Scheme) == isSpecialProtocol(s) {
+			if _, err := url.ParseRequestURI(s + "://" + u.Url.Host); err == nil {
+				u.Url.Scheme = s
 			}
 		}
 	})
@@ -327,43 +327,43 @@ func (m *urlModule) createURLPrototype() *goja.Object {
 	// Search
 	m.defineURLAccessorProp(p, "search", func(u *nodeURL) interface{} {
 		u.syncSearchParams()
-		if u.url.RawQuery != "" {
-			return "?" + u.url.RawQuery
+		if u.Url.RawQuery != "" {
+			return "?" + u.Url.RawQuery
 		}
 		return ""
 	}, func(u *nodeURL, arg goja.Value) {
-		u.url.RawQuery = arg.String()
-		fixRawQuery(u.url)
-		if u.searchParams != nil {
-			u.searchParams = parseSearchQuery(u.url.RawQuery)
-			if u.searchParams == nil {
-				u.searchParams = make(searchParams, 0)
+		u.Url.RawQuery = arg.String()
+		fixRawQuery(u.Url)
+		if u.SearchParams != nil {
+			u.SearchParams = parseSearchQuery(u.Url.RawQuery)
+			if u.SearchParams == nil {
+				u.SearchParams = make(SearchParams, 0)
 			}
 		}
 	})
 
 	// search Params
 	m.defineURLAccessorProp(p, "searchParams", func(u *nodeURL) interface{} {
-		if u.searchParams == nil {
-			sp := parseSearchQuery(u.url.RawQuery)
+		if u.SearchParams == nil {
+			sp := parseSearchQuery(u.Url.RawQuery)
 			if sp == nil {
-				sp = make(searchParams, 0)
+				sp = make(SearchParams, 0)
 			}
-			u.searchParams = sp
+			u.SearchParams = sp
 		}
-		return m.newURLSearchParams((*urlSearchParams)(u))
+		return m.newURLSearchParams((*UrlSearchParams)(u))
 	}, nil)
 
 	p.Set("toString", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toURL(m.r, call.This)
 		u.syncSearchParams()
-		return m.r.ToValue(u.url.String())
+		return m.r.ToValue(u.Url.String())
 	}))
 
 	p.Set("toJSON", m.r.ToValue(func(call goja.FunctionCall) goja.Value {
 		u := toURL(m.r, call.This)
 		u.syncSearchParams()
-		return m.r.ToValue(u.url.String())
+		return m.r.ToValue(u.Url.String())
 	}))
 
 	return p
@@ -379,7 +379,7 @@ func (m *urlModule) createURLConstructor() goja.Value {
 		} else {
 			u = m.parseURL(call.Argument(0).String(), true)
 		}
-		res := m.r.ToValue(&nodeURL{url: u}).(*goja.Object)
+		res := m.r.ToValue(&nodeURL{Url: u}).(*goja.Object)
 		res.SetPrototype(call.This.Prototype())
 		return res
 	}).(*goja.Object)
