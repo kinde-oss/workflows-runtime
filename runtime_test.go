@@ -17,20 +17,21 @@ import (
 )
 
 const testContextValue contextValue = "contextValue"
+const testContextValueVm contextValue = "contextValue2"
 
 type contextValue string
 
 func Test_GojaLogVmInits(t *testing.T) {
 	setupWasCalled := false
 	gojaRuntime.BeforeVMSetupFunc(func(ctx context.Context, vm *goja.Runtime) context.Context {
-		return context.WithValue(ctx, testContextValue, vm)
+		return context.WithValue(ctx, testContextValueVm, vm)
 	})
 	gojaRuntime.AfterVMSetupFunc(func(ctx context.Context, vm *goja.Runtime) {
 		setupWasCalled = true
 	})
 
 	gojaRuntime.RegisterNativeAPI("test").RegisterNativeFunction("test2", func(ctx context.Context, binding registry.BindingSettings, jsContext gojaRuntime.JsContext, args ...interface{}) (interface{}, error) {
-		if ctx.Value(testContextValue) == nil {
+		if ctx.Value(testContextValueVm) == nil {
 			panic("test context value not found")
 		}
 
