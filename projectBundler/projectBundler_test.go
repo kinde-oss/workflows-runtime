@@ -1,6 +1,7 @@
 package project_bundler
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -14,7 +15,7 @@ func Test_ProjectBunler(t *testing.T) {
 		StartFolder: somePathInsideProject,
 	})
 
-	kindeProject, discoveryError := projectBundler.Discover()
+	kindeProject, discoveryError := projectBundler.Discover(context.Background())
 
 	assert := assert.New(t)
 

@@ -10,7 +10,11 @@ import (
 	runtimesRegistry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
+const pluginsKey bundlerContext = "bundlerPlugins"
+
 type (
+	bundlerContext string
+
 	WorkflowSettings struct {
 		ID       string                                      `json:"id"`
 		Other    map[string]interface{}                      `json:"other"`
@@ -32,11 +36,10 @@ type (
 		WorkingFolder       string
 		EntryPoints         []string
 		IntrospectionExport string
-		Plugins             []api.Plugin
 	}
 
 	WorkflowBundler interface {
-		Bundle() BundlerResult
+		Bundle(ctx context.Context) BundlerResult
 	}
 
 	builder struct {
@@ -53,7 +56,23 @@ func NewWorkflowBundler(options BundlerOptions) WorkflowBundler {
 	}
 }
 
-func (b *builder) Bundle() BundlerResult {
+func WithBundlerPlugins(ctx context.Context, plugins []api.Plugin) context.Context {
+	return context.WithValue(ctx, pluginsKey, plugins)
+}
+
+func (b *builder) getContextPlugins(ctx context.Context) []api.Plugin {
+	if ctx == nil {
+		return nil
+	}
+
+	if plugins, ok := ctx.Value(pluginsKey).([]api.Plugin); ok {
+		return plugins
+	}
+
+	return nil
+}
+
+func (b *builder) Bundle(ctx context.Context) BundlerResult {
 	opts := api.BuildOptions{
 		Loader: map[string]api.Loader{
 			".js":  api.LoaderJS,
@@ -76,7 +95,7 @@ func (b *builder) Bundle() BundlerResult {
 		MinifyWhitespace: true,
 		MinifySyntax:     true,
 		Outdir:           "output",
-		Plugins:          b.bundleOptions.Plugins,
+		Plugins:          b.getContextPlugins(ctx),
 	}
 	tr := api.Build(opts)
 

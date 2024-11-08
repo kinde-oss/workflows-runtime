@@ -1,6 +1,7 @@
 package project_bundler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,7 +41,7 @@ type (
 	}
 
 	ProjectBundler interface {
-		Discover() (*KindeProject, error)
+		Discover(ctx context.Context) (*KindeProject, error)
 	}
 
 	projectBundler struct {
@@ -48,7 +49,7 @@ type (
 	}
 )
 
-func (kw *KindeEnvironment) discover(absLocation string) {
+func (kw *KindeEnvironment) discover(ctx context.Context, absLocation string) {
 	//environment/workflows
 	workflowsPath := filepath.Join(absLocation, "environment", "workflows")
 	//check if the folder exists
@@ -70,7 +71,7 @@ func (kw *KindeEnvironment) discover(absLocation string) {
 						WorkflowRootDirectory: workflowsPath,
 						EntryPoints:           []string{file.Name()},
 					}
-					discoveredWorkflow.bundleAndIntrospect()
+					discoveredWorkflow.bundleAndIntrospect(ctx)
 					kw.Workflows = append(kw.Workflows, discoveredWorkflow)
 
 				}
@@ -81,14 +82,14 @@ func (kw *KindeEnvironment) discover(absLocation string) {
 }
 
 // Discover implements ProjectBundler.
-func (p *projectBundler) Discover() (*KindeProject, error) {
+func (p *projectBundler) Discover(ctx context.Context) (*KindeProject, error) {
 	result := &KindeProject{}
 	err := result.discoverKindeRoot(p.options.StartFolder)
 	if err != nil {
 		return nil, err
 	}
 
-	result.Environment.discover(filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
+	result.Environment.discover(ctx, filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
 
 	return result, nil
 }
@@ -143,12 +144,12 @@ func (*KindeProject) readProjectConfiguration(configFileInfo string) (*ProjectCo
 	return result, nil
 }
 
-func (kw *KindeWorkflow) bundleAndIntrospect() {
+func (kw *KindeWorkflow) bundleAndIntrospect(ctx context.Context) {
 	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions{
 		WorkingFolder: kw.WorkflowRootDirectory,
 		EntryPoints:   kw.EntryPoints,
 	})
-	bundlerResult := workflowBuilder.Bundle()
+	bundlerResult := workflowBuilder.Bundle(ctx)
 	kw.Bundle = bundlerResult
 
 }
