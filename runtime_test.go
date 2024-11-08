@@ -134,7 +134,7 @@ func Test_ProjectBunlerE2E(t *testing.T) {
 		StartFolder: somePathInsideProject,
 	})
 
-	kindeProject, discoveryError := projectBundler.Discover()
+	kindeProject, discoveryError := projectBundler.Discover(context.Background())
 
 	assert := assert.New(t)
 
