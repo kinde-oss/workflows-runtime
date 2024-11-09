@@ -143,9 +143,10 @@ func Test_ProjectBunlerE2E(t *testing.T) {
 	}
 	assert.Equal("2024-12-09", kindeProject.Configuration.Version)
 	assert.Equal("kindeSrc", kindeProject.Configuration.RootDir)
-	assert.Equal(2, len(kindeProject.Environment.Workflows))
+	assert.Equal(3, len(kindeProject.Environment.Workflows))
 	assert.Empty(kindeProject.Environment.Workflows[0].Bundle.Errors)
 	assert.Empty(kindeProject.Environment.Workflows[1].Bundle.Errors)
+	assert.Empty(kindeProject.Environment.Workflows[2].Bundle.Errors)
 
 	for _, workflow := range kindeProject.Environment.Workflows {
 		t.Run(fmt.Sprintf("Test_ExecuteWorkflowWithGoja - %v", workflow.WorkflowRootDirectory), testExecution(workflow, assert))
