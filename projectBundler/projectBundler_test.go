@@ -24,7 +24,7 @@ func Test_ProjectBunler(t *testing.T) {
 	}
 	assert.Equal("2024-12-09", kindeProject.Configuration.Version)
 	assert.Equal("kindeSrc", kindeProject.Configuration.RootDir)
-	assert.Equal(2, len(kindeProject.Environment.Workflows))
+	assert.Equal(3, len(kindeProject.Environment.Workflows))
 	assert.Empty(kindeProject.Environment.Workflows[0].Bundle.Errors)
 	assert.Empty(kindeProject.Environment.Workflows[1].Bundle.Errors)
 

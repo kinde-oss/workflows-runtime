@@ -65,19 +65,24 @@ func (kw *KindeEnvironment) discover(ctx context.Context, absLocation string) {
 
 			files, _ := os.ReadDir(workflowsPath)
 			for _, file := range files {
-				fileName := strings.ToLower(file.Name())
-				if strings.HasSuffix(fileName, "workflow.ts") || strings.HasSuffix(fileName, "workflow.js") {
-					discoveredWorkflow := KindeWorkflow{
-						WorkflowRootDirectory: workflowsPath,
-						EntryPoints:           []string{file.Name()},
-					}
-					discoveredWorkflow.bundleAndIntrospect(ctx)
-					kw.Workflows = append(kw.Workflows, discoveredWorkflow)
-
-				}
+				maybeAddWorkflow(ctx, file.Name(), workflowsPath, kw)
 			}
 
+		} else {
+			maybeAddWorkflow(ctx, workflow.Name(), workflowsPath, kw)
 		}
+	}
+}
+
+func maybeAddWorkflow(ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment) {
+	fileName := strings.ToLower(file)
+	if strings.HasSuffix(fileName, "workflow.ts") || strings.HasSuffix(fileName, "workflow.js") {
+		discoveredWorkflow := KindeWorkflow{
+			WorkflowRootDirectory: rootDirectory,
+			EntryPoints:           []string{file},
+		}
+		discoveredWorkflow.bundleAndIntrospect(ctx)
+		kw.Workflows = append(kw.Workflows, discoveredWorkflow)
 	}
 }
 
