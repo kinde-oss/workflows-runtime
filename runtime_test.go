@@ -21,6 +21,13 @@ const testContextValueVm contextValue = "contextValue2"
 
 type contextValue string
 
+type workflowSettings struct {
+	ID string `json:"id"`
+}
+
+type pageSettings struct {
+}
+
 func Test_GojaLogVmInits(t *testing.T) {
 	setupWasCalled := false
 	gojaRuntime.BeforeVMSetupFunc(func(ctx context.Context, vm *goja.Runtime) context.Context {
@@ -130,7 +137,7 @@ func Test_GojaPrecompiledRuntime(t *testing.T) {
 func Test_ProjectBunlerE2E(t *testing.T) {
 	somePathInsideProject, _ := filepath.Abs("./testData/kindeSrc/environment/workflows") //starting in a middle of nowhere, so we need to go up to the root of the project
 
-	projectBundler := projectBundler.NewProjectBundler(projectBundler.DiscoveryOptions{
+	projectBundler := projectBundler.NewProjectBundler(projectBundler.DiscoveryOptions[workflowSettings, pageSettings]{
 		StartFolder: somePathInsideProject,
 	})
 
@@ -154,7 +161,7 @@ func Test_ProjectBunlerE2E(t *testing.T) {
 
 }
 
-func testExecution(workflow projectBundler.KindeWorkflow, assert *assert.Assertions) func(t *testing.T) {
+func testExecution(workflow projectBundler.KindeWorkflow[workflowSettings], assert *assert.Assertions) func(t *testing.T) {
 	return func(t *testing.T) {
 		runner := getGojaRunner()
 		logger := testLogger{}

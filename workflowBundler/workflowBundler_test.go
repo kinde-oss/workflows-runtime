@@ -11,13 +11,21 @@ import (
 
 func Test_WorkflowBundler(t *testing.T) {
 
+	type workflowSettings struct {
+		ID      string `json:"id"`
+		Trigger string `json:"trigger"`
+	}
+
 	workflowPath, _ := filepath.Abs("../testData/kindeSrc/environment/workflows/evTest")
 
 	pluginSetupWasCalled := false
 
-	workflowBuilder := NewWorkflowBundler(BundlerOptions{
+	workflowBuilder := NewWorkflowBundler[workflowSettings](BundlerOptions[workflowSettings]{
 		WorkingFolder: workflowPath,
 		EntryPoints:   []string{"tokensWorkflow.ts"},
+		OnDiscovered: func(bundle *BundlerResult[workflowSettings]) {
+			bundle.Errors = append(bundle.Errors, "ID is required")
+		},
 	})
 	ctx := WithBundlerPlugins(context.Background(), []api.Plugin{
 		{
@@ -31,9 +39,9 @@ func Test_WorkflowBundler(t *testing.T) {
 
 	assert := assert.New(t)
 	assert.True(pluginSetupWasCalled, "plugin setup was not called")
-	assert.Nil(bundlerResult.Errors, "errors were not expected")
+	assert.Equal(bundlerResult.Errors[0], "ID is required")
 	assert.NotEmpty(bundlerResult.Content.Source)
-	assert.Equal("tokenGen", bundlerResult.Content.Settings.ID)
-	assert.Equal("onTokenGeneration", bundlerResult.Content.Settings.Other["trigger"])
+	assert.Equal("tokenGen", bundlerResult.Content.Settings.Additional.ID)
+	assert.Equal("onTokenGeneration", bundlerResult.Content.Settings.Additional.Trigger)
 	assert.NotEmpty(bundlerResult.Content.BundleHash)
 }
