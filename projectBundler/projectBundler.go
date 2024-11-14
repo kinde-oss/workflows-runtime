@@ -94,7 +94,7 @@ func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverPages(ctx 
 	pagesPath := filepath.Join(absLocation, "environment", "pages")
 	_, err := os.Stat(pagesPath)
 	if err != nil {
-		log.Warn().Msgf("could not find workflows folder: %s", pagesPath)
+		log.Warn().Msgf("could not find pages folder: %s", pagesPath)
 	}
 
 	filepath.Walk(pagesPath, func(path string, info os.FileInfo, err error) error {
