@@ -5,13 +5,18 @@ import (
 	"path/filepath"
 	"testing"
 
+	builder "github.com/kinde-oss/workflows-runtime/workflowBundler"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_ProjectBunler(t *testing.T) {
 	somePathInsideProject, _ := filepath.Abs("../testData/kindeSrc/environment/workflows") //starting in a middle of nowhere, so we need to go up to the root of the project
 
-	projectBundler := NewProjectBundler(DiscoveryOptions{
+	type workflowSettings struct {
+		ID string `json:"id"`
+	}
+
+	projectBundler := NewProjectBundler(DiscoveryOptions[builder.WorkflowSettings[workflowSettings]]{
 		StartFolder: somePathInsideProject,
 	})
 

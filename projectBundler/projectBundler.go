@@ -21,35 +21,35 @@ type (
 		AbsLocation string `json:"location"`
 	}
 
-	KindeWorkflow struct {
-		WorkflowRootDirectory string                `json:"workflow_root_directory"`
-		EntryPoints           []string              `json:"entry_points"`
-		Bundle                bundler.BundlerResult `json:"bundle"`
+	KindeWorkflow[TSettings any] struct {
+		WorkflowRootDirectory string    `json:"workflow_root_directory"`
+		EntryPoints           []string  `json:"entry_points"`
+		Bundle                TSettings `json:"bundle"`
 	}
 
-	KindeEnvironment struct {
-		Workflows []KindeWorkflow `json:"workflows"`
+	KindeEnvironment[TWorkflowSettings any] struct {
+		Workflows []KindeWorkflow[TWorkflowSettings] `json:"workflows"`
 	}
 
-	KindeProject struct {
-		Configuration ProjectConfiguration `json:"configuration"`
-		Environment   KindeEnvironment     `json:"environment"`
+	KindeProject[TWorkflowSettings any] struct {
+		Configuration ProjectConfiguration                `json:"configuration"`
+		Environment   KindeEnvironment[TWorkflowSettings] `json:"environment"`
 	}
 
-	DiscoveryOptions struct {
+	DiscoveryOptions[TWorkflowSettings any] struct {
 		StartFolder string
 	}
 
-	ProjectBundler interface {
-		Discover(ctx context.Context) (*KindeProject, error)
+	ProjectBundler[TWorkflowSettings any] interface {
+		Discover(ctx context.Context) (*KindeProject[TWorkflowSettings], error)
 	}
 
-	projectBundler struct {
-		options DiscoveryOptions
+	projectBundler[TWorkflowSettings any] struct {
+		options DiscoveryOptions[TWorkflowSettings]
 	}
 )
 
-func (kw *KindeEnvironment) discover(ctx context.Context, absLocation string) {
+func (kw *KindeEnvironment[TWorkflowSettings]) discover(ctx context.Context, absLocation string) {
 	//environment/workflows
 	workflowsPath := filepath.Join(absLocation, "environment", "workflows")
 	//check if the folder exists
@@ -74,10 +74,10 @@ func (kw *KindeEnvironment) discover(ctx context.Context, absLocation string) {
 	}
 }
 
-func maybeAddWorkflow(ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment) {
+func maybeAddWorkflow[TWorkflowSettings any](ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment[TWorkflowSettings]) {
 	fileName := strings.ToLower(file)
 	if strings.HasSuffix(fileName, "workflow.ts") || strings.HasSuffix(fileName, "workflow.js") {
-		discoveredWorkflow := KindeWorkflow{
+		discoveredWorkflow := KindeWorkflow[TWorkflowSettings]{
 			WorkflowRootDirectory: rootDirectory,
 			EntryPoints:           []string{file},
 		}
@@ -87,8 +87,8 @@ func maybeAddWorkflow(ctx context.Context, file string, rootDirectory string, kw
 }
 
 // Discover implements ProjectBundler.
-func (p *projectBundler) Discover(ctx context.Context) (*KindeProject, error) {
-	result := &KindeProject{}
+func (p *projectBundler[TWorkflowSettings]) Discover(ctx context.Context) (*KindeProject[TWorkflowSettings], error) {
+	result := &KindeProject[TWorkflowSettings]{}
 	err := result.discoverKindeRoot(p.options.StartFolder)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (p *projectBundler) Discover(ctx context.Context) (*KindeProject, error) {
 	return result, nil
 }
 
-func (kp *KindeProject) discoverKindeRoot(startFolder string) error {
+func (kp *KindeProject[TWorkflowSettings]) discoverKindeRoot(startFolder string) error {
 
 	currentDirectory, _ := filepath.Abs(startFolder)
 
@@ -128,13 +128,13 @@ func (kp *KindeProject) discoverKindeRoot(startFolder string) error {
 
 }
 
-func NewProjectBundler(discoveryOptions DiscoveryOptions) ProjectBundler {
-	return &projectBundler{
+func NewProjectBundler[TWorkflowSettings any](discoveryOptions DiscoveryOptions[TWorkflowSettings]) ProjectBundler[TWorkflowSettings] {
+	return &projectBundler[TWorkflowSettings]{
 		options: discoveryOptions,
 	}
 }
 
-func (*KindeProject) readProjectConfiguration(configFileInfo string) (*ProjectConfiguration, error) {
+func (*KindeProject[TWorkflowSettings]) readProjectConfiguration(configFileInfo string) (*ProjectConfiguration, error) {
 	confiHandler, _ := os.Open(configFileInfo)
 	configFile, err := io.ReadAll(confiHandler)
 	if err != nil {
@@ -149,8 +149,8 @@ func (*KindeProject) readProjectConfiguration(configFileInfo string) (*ProjectCo
 	return result, nil
 }
 
-func (kw *KindeWorkflow) bundleAndIntrospect(ctx context.Context) {
-	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions{
+func (kw *KindeWorkflow[TWorkflowSettings]) bundleAndIntrospect(ctx context.Context) {
+	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TWorkflowSettings]{
 		WorkingFolder: kw.WorkflowRootDirectory,
 		EntryPoints:   kw.EntryPoints,
 	})
