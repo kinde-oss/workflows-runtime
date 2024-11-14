@@ -171,7 +171,7 @@ func testExecution(workflow projectBundler.KindeWorkflow[workflowSettings], asse
 				Source:     workflow.Bundle.Content.Source,
 				SourceType: registry.Source_ContentType_Text,
 			},
-			//RequestedBindings: workflow.Bundle.Content.Settings.Bindings,
+			RequestedBindings: workflow.Bundle.Content.Settings.Bindings,
 		}, registry.StartOptions{
 			EntryPoint: "handle",
 			Loggger:    &logger,

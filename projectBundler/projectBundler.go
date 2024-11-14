@@ -22,9 +22,9 @@ type (
 	}
 
 	KindeWorkflow[TSettings any] struct {
-		WorkflowRootDirectory string    `json:"workflow_root_directory"`
-		EntryPoints           []string  `json:"entry_points"`
-		Bundle                TSettings `json:"bundle"`
+		WorkflowRootDirectory string                           `json:"workflow_root_directory"`
+		EntryPoints           []string                         `json:"entry_points"`
+		Bundle                bundler.BundlerResult[TSettings] `json:"bundle"`
 	}
 
 	KindeEnvironment[TWorkflowSettings any] struct {
