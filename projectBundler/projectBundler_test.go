@@ -5,18 +5,20 @@ import (
 	"path/filepath"
 	"testing"
 
-	builder "github.com/kinde-oss/workflows-runtime/workflowBundler"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_ProjectBunler(t *testing.T) {
-	somePathInsideProject, _ := filepath.Abs("../testData/kindeSrc/environment/workflows") //starting in a middle of nowhere, so we need to go up to the root of the project
+	somePathInsideProject, _ := filepath.Abs("../testData/kindeSrc/environment") //starting in a middle of nowhere, so we need to go up to the root of the project
 
 	type workflowSettings struct {
 		ID string `json:"id"`
 	}
 
-	projectBundler := NewProjectBundler(DiscoveryOptions[builder.WorkflowSettings[workflowSettings]]{
+	type pageSettings struct {
+	}
+
+	projectBundler := NewProjectBundler(DiscoveryOptions[workflowSettings, pageSettings]{
 		StartFolder: somePathInsideProject,
 	})
 
@@ -32,5 +34,9 @@ func Test_ProjectBunler(t *testing.T) {
 	assert.Equal(3, len(kindeProject.Environment.Workflows))
 	assert.Empty(kindeProject.Environment.Workflows[0].Bundle.Errors)
 	assert.Empty(kindeProject.Environment.Workflows[1].Bundle.Errors)
+
+	assert.Equal(2, len(kindeProject.Environment.Pages))
+	assert.Empty(kindeProject.Environment.Pages[0].Bundle.Errors)
+	assert.Empty(kindeProject.Environment.Pages[1].Bundle.Errors)
 
 }

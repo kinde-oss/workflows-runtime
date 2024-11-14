@@ -27,29 +27,36 @@ type (
 		Bundle                bundler.BundlerResult[TSettings] `json:"bundle"`
 	}
 
-	KindeEnvironment[TWorkflowSettings any] struct {
+	KindePage[TSettings any] struct {
+		RootDirectory string                           `json:"root_directory"`
+		EntryPoints   []string                         `json:"entry_points"`
+		Bundle        bundler.BundlerResult[TSettings] `json:"bundle"`
+	}
+
+	KindeEnvironment[TWorkflowSettings, TPageSettings any] struct {
 		Workflows []KindeWorkflow[TWorkflowSettings] `json:"workflows"`
+		Pages     []KindePage[TPageSettings]         `json:"pages"`
 	}
 
-	KindeProject[TWorkflowSettings any] struct {
-		Configuration ProjectConfiguration                `json:"configuration"`
-		Environment   KindeEnvironment[TWorkflowSettings] `json:"environment"`
+	KindeProject[TWorkflowSettings, TPageSettings any] struct {
+		Configuration ProjectConfiguration                               `json:"configuration"`
+		Environment   KindeEnvironment[TWorkflowSettings, TPageSettings] `json:"environment"`
 	}
 
-	DiscoveryOptions[TWorkflowSettings any] struct {
+	DiscoveryOptions[TWorkflowSettings, TPageSettings any] struct {
 		StartFolder string
 	}
 
-	ProjectBundler[TWorkflowSettings any] interface {
-		Discover(ctx context.Context) (*KindeProject[TWorkflowSettings], error)
+	ProjectBundler[TWorkflowSettings, TPageSettings any] interface {
+		Discover(ctx context.Context) (*KindeProject[TWorkflowSettings, TPageSettings], error)
 	}
 
-	projectBundler[TWorkflowSettings any] struct {
-		options DiscoveryOptions[TWorkflowSettings]
+	projectBundler[TWorkflowSettings, TPageSettings any] struct {
+		options DiscoveryOptions[TWorkflowSettings, TPageSettings]
 	}
 )
 
-func (kw *KindeEnvironment[TWorkflowSettings]) discover(ctx context.Context, absLocation string) {
+func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverWorkflows(ctx context.Context, absLocation string) {
 	//environment/workflows
 	workflowsPath := filepath.Join(absLocation, "environment", "workflows")
 	//check if the folder exists
@@ -58,23 +65,20 @@ func (kw *KindeEnvironment[TWorkflowSettings]) discover(ctx context.Context, abs
 		log.Warn().Msgf("could not find workflows folder: %s", workflowsPath)
 		return
 	}
-	workflows, _ := os.ReadDir(workflowsPath)
-	for _, workflow := range workflows {
-		if workflow.IsDir() {
-			workflowsPath := filepath.Join(workflowsPath, workflow.Name())
 
-			files, _ := os.ReadDir(workflowsPath)
-			for _, file := range files {
-				maybeAddWorkflow(ctx, file.Name(), workflowsPath, kw)
-			}
-
-		} else {
-			maybeAddWorkflow(ctx, workflow.Name(), workflowsPath, kw)
+	filepath.Walk(workflowsPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
-	}
+		if !info.IsDir() {
+			maybeAddWorkflow(ctx, info.Name(), filepath.Dir(path), kw)
+		}
+		return nil
+	})
+
 }
 
-func maybeAddWorkflow[TWorkflowSettings any](ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment[TWorkflowSettings]) {
+func maybeAddWorkflow[TWorkflowSettings, TPageSettings any](ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) {
 	fileName := strings.ToLower(file)
 	if strings.HasSuffix(fileName, "workflow.ts") || strings.HasSuffix(fileName, "workflow.js") {
 		discoveredWorkflow := KindeWorkflow[TWorkflowSettings]{
@@ -86,20 +90,52 @@ func maybeAddWorkflow[TWorkflowSettings any](ctx context.Context, file string, r
 	}
 }
 
+func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverPages(ctx context.Context, absLocation string) {
+	pagesPath := filepath.Join(absLocation, "environment", "pages")
+	_, err := os.Stat(pagesPath)
+	if err != nil {
+		log.Warn().Msgf("could not find workflows folder: %s", pagesPath)
+	}
+
+	filepath.Walk(pagesPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			maybeAddPage(ctx, info.Name(), filepath.Dir(path), kw)
+		}
+		return nil
+	})
+
+}
+
+func maybeAddPage[TWorkflowSettings, TPageSettings any](ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) {
+	fileName := strings.ToLower(file)
+	if strings.HasSuffix(fileName, "page.ts") || strings.HasSuffix(fileName, "page.js") || strings.HasSuffix(fileName, "page.tsx") || strings.HasSuffix(fileName, "page.jsx") {
+		discoveredPage := KindePage[TPageSettings]{
+			RootDirectory: rootDirectory,
+			EntryPoints:   []string{file},
+		}
+		discoveredPage.bundleAndIntrospect(ctx)
+		kw.Pages = append(kw.Pages, discoveredPage)
+	}
+}
+
 // Discover implements ProjectBundler.
-func (p *projectBundler[TWorkflowSettings]) Discover(ctx context.Context) (*KindeProject[TWorkflowSettings], error) {
-	result := &KindeProject[TWorkflowSettings]{}
+func (p *projectBundler[TWorkflowSettings, TPageSettings]) Discover(ctx context.Context) (*KindeProject[TWorkflowSettings, TPageSettings], error) {
+	result := &KindeProject[TWorkflowSettings, TPageSettings]{}
 	err := result.discoverKindeRoot(p.options.StartFolder)
 	if err != nil {
 		return nil, err
 	}
 
-	result.Environment.discover(ctx, filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
+	result.Environment.discoverWorkflows(ctx, filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
+	result.Environment.discoverPages(ctx, filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
 
 	return result, nil
 }
 
-func (kp *KindeProject[TWorkflowSettings]) discoverKindeRoot(startFolder string) error {
+func (kp *KindeProject[TWorkflowSettings, TPageSettings]) discoverKindeRoot(startFolder string) error {
 
 	currentDirectory, _ := filepath.Abs(startFolder)
 
@@ -128,13 +164,13 @@ func (kp *KindeProject[TWorkflowSettings]) discoverKindeRoot(startFolder string)
 
 }
 
-func NewProjectBundler[TWorkflowSettings any](discoveryOptions DiscoveryOptions[TWorkflowSettings]) ProjectBundler[TWorkflowSettings] {
-	return &projectBundler[TWorkflowSettings]{
+func NewProjectBundler[TWorkflowSettings, TPageSettings any](discoveryOptions DiscoveryOptions[TWorkflowSettings, TPageSettings]) ProjectBundler[TWorkflowSettings, TPageSettings] {
+	return &projectBundler[TWorkflowSettings, TPageSettings]{
 		options: discoveryOptions,
 	}
 }
 
-func (*KindeProject[TWorkflowSettings]) readProjectConfiguration(configFileInfo string) (*ProjectConfiguration, error) {
+func (*KindeProject[TWorkflowSettings, TPageSettings]) readProjectConfiguration(configFileInfo string) (*ProjectConfiguration, error) {
 	confiHandler, _ := os.Open(configFileInfo)
 	configFile, err := io.ReadAll(confiHandler)
 	if err != nil {
@@ -156,5 +192,13 @@ func (kw *KindeWorkflow[TWorkflowSettings]) bundleAndIntrospect(ctx context.Cont
 	})
 	bundlerResult := workflowBuilder.Bundle(ctx)
 	kw.Bundle = bundlerResult
+}
 
+func (kw *KindePage[TWorkflowSettings]) bundleAndIntrospect(ctx context.Context) {
+	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TWorkflowSettings]{
+		WorkingFolder: kw.RootDirectory,
+		EntryPoints:   kw.EntryPoints,
+	})
+	bundlerResult := workflowBuilder.Bundle(ctx)
+	kw.Bundle = bundlerResult
 }

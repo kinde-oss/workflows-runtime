@@ -25,6 +25,9 @@ type workflowSettings struct {
 	ID string `json:"id"`
 }
 
+type pageSettings struct {
+}
+
 func Test_GojaLogVmInits(t *testing.T) {
 	setupWasCalled := false
 	gojaRuntime.BeforeVMSetupFunc(func(ctx context.Context, vm *goja.Runtime) context.Context {
@@ -134,7 +137,7 @@ func Test_GojaPrecompiledRuntime(t *testing.T) {
 func Test_ProjectBunlerE2E(t *testing.T) {
 	somePathInsideProject, _ := filepath.Abs("./testData/kindeSrc/environment/workflows") //starting in a middle of nowhere, so we need to go up to the root of the project
 
-	projectBundler := projectBundler.NewProjectBundler(projectBundler.DiscoveryOptions[workflowSettings]{
+	projectBundler := projectBundler.NewProjectBundler(projectBundler.DiscoveryOptions[workflowSettings, pageSettings]{
 		StartFolder: somePathInsideProject,
 	})
 

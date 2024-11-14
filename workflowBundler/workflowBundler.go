@@ -80,6 +80,7 @@ func (b *builder[TSettings]) Bundle(ctx context.Context) BundlerResult[TSettings
 			".js":  api.LoaderJS,
 			".tsx": api.LoaderTSX,
 			".ts":  api.LoaderTS,
+			".jsx": api.LoaderJSX,
 		},
 		AbsWorkingDir:    b.bundleOptions.WorkingFolder,
 		Target:           api.ESNext,
