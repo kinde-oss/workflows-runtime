@@ -41,7 +41,7 @@ func Test_WorkflowBundler(t *testing.T) {
 	assert.True(pluginSetupWasCalled, "plugin setup was not called")
 	assert.Equal(bundlerResult.Errors[0], "ID is required")
 	assert.NotEmpty(bundlerResult.Content.Source)
-	assert.Equal("tokenGen", bundlerResult.Content.Settings.Additional.ID)
-	assert.Equal("onTokenGeneration", bundlerResult.Content.Settings.Additional.Trigger)
+	assert.Equal("tokenGen", bundlerResult.Content.Settings.Other.ID)
+	assert.Equal("onTokenGeneration", bundlerResult.Content.Settings.Other.Trigger)
 	assert.NotEmpty(bundlerResult.Content.BundleHash)
 }

@@ -17,8 +17,8 @@ type (
 	bundlerContext string
 
 	WorkflowSettings[TSettings any] struct {
-		Bindings   map[string]runtimesRegistry.BindingSettings `json:"bindings"`
-		Additional TSettings
+		Bindings map[string]runtimesRegistry.BindingSettings `json:"bindings"`
+		Other    TSettings                                   `json:"other"`
 	}
 
 	BundledContent[TSettings any] struct {
@@ -188,7 +188,7 @@ func (settings *WorkflowSettings[TSettings]) UnmarshalJSON(data []byte) error {
 	set := new(TSettings)
 	err = json.Unmarshal(data, set)
 
-	settings.Additional = *set
+	settings.Other = *set
 
 	return err
 
