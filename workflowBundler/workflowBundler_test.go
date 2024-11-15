@@ -21,8 +21,9 @@ func Test_WorkflowBundler(t *testing.T) {
 	pluginSetupWasCalled := false
 
 	workflowBuilder := NewWorkflowBundler[workflowSettings](BundlerOptions[workflowSettings]{
-		WorkingFolder: workflowPath,
-		EntryPoints:   []string{"tokensWorkflow.ts"},
+		WorkingFolder:       workflowPath,
+		EntryPoints:         []string{"tokensWorkflow.ts"},
+		IntrospectionExport: "workflowSettings",
 		OnDiscovered: func(bundle *BundlerResult[workflowSettings]) {
 			bundle.Errors = append(bundle.Errors, "ID is required")
 		},

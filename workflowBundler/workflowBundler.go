@@ -50,9 +50,6 @@ type (
 )
 
 func NewWorkflowBundler[TSettings any](options BundlerOptions[TSettings]) WorkflowBundler[TSettings] {
-	if options.IntrospectionExport == "" {
-		options.IntrospectionExport = "workflowSettings"
-	}
 	return &builder[TSettings]{
 		bundleOptions: options,
 	}

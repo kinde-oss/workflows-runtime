@@ -187,8 +187,9 @@ func (*KindeProject[TWorkflowSettings, TPageSettings]) readProjectConfiguration(
 
 func (kw *KindeWorkflow[TSettings]) bundleAndIntrospect(ctx context.Context) {
 	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TSettings]{
-		WorkingFolder: kw.WorkflowRootDirectory,
-		EntryPoints:   kw.EntryPoints,
+		WorkingFolder:       kw.WorkflowRootDirectory,
+		EntryPoints:         kw.EntryPoints,
+		IntrospectionExport: "workflowSettings",
 	})
 	bundlerResult := workflowBuilder.Bundle(ctx)
 	kw.Bundle = bundlerResult
@@ -196,8 +197,9 @@ func (kw *KindeWorkflow[TSettings]) bundleAndIntrospect(ctx context.Context) {
 
 func (kw *KindePage[TSettings]) bundleAndIntrospect(ctx context.Context) {
 	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TSettings]{
-		WorkingFolder: kw.RootDirectory,
-		EntryPoints:   kw.EntryPoints,
+		WorkingFolder:       kw.RootDirectory,
+		EntryPoints:         kw.EntryPoints,
+		IntrospectionExport: "pageSettings",
 	})
 	bundlerResult := workflowBuilder.Bundle(ctx)
 	kw.Bundle = bundlerResult
