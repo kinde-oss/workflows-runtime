@@ -34,8 +34,9 @@ type (
 	}
 
 	KindeEnvironment[TWorkflowSettings, TPageSettings any] struct {
-		Workflows []KindeWorkflow[TWorkflowSettings] `json:"workflows"`
-		Pages     []KindePage[TPageSettings]         `json:"pages"`
+		Workflows        []KindeWorkflow[TWorkflowSettings] `json:"workflows"`
+		Pages            []KindePage[TPageSettings]         `json:"pages"`
+		discoveryOptions DiscoveryOptions[TWorkflowSettings, TPageSettings]
 	}
 
 	KindeProject[TWorkflowSettings, TPageSettings any] struct {
@@ -44,7 +45,9 @@ type (
 	}
 
 	DiscoveryOptions[TWorkflowSettings, TPageSettings any] struct {
-		StartFolder string
+		StartFolder          string
+		OnWorkflowDiscovered func(bundle *bundler.BundlerResult[TWorkflowSettings])
+		OnPageDiscovered     func(bundle *bundler.BundlerResult[TPageSettings])
 	}
 
 	ProjectBundler[TWorkflowSettings, TPageSettings any] interface {
@@ -85,7 +88,7 @@ func maybeAddWorkflow[TWorkflowSettings, TPageSettings any](ctx context.Context,
 			WorkflowRootDirectory: rootDirectory,
 			EntryPoints:           []string{file},
 		}
-		discoveredWorkflow.bundleAndIntrospect(ctx)
+		discoveredWorkflow.bundleAndIntrospect(ctx, kw.discoveryOptions.OnWorkflowDiscovered)
 		kw.Workflows = append(kw.Workflows, discoveredWorkflow)
 	}
 }
@@ -116,23 +119,28 @@ func maybeAddPage[TWorkflowSettings, TPageSettings any](ctx context.Context, fil
 			RootDirectory: rootDirectory,
 			EntryPoints:   []string{file},
 		}
-		discoveredPage.bundleAndIntrospect(ctx)
+		discoveredPage.bundleAndIntrospect(ctx, kw.discoveryOptions.OnPageDiscovered)
 		kw.Pages = append(kw.Pages, discoveredPage)
 	}
 }
 
 // Discover implements ProjectBundler.
 func (p *projectBundler[TWorkflowSettings, TPageSettings]) Discover(ctx context.Context) (*KindeProject[TWorkflowSettings, TPageSettings], error) {
-	result := &KindeProject[TWorkflowSettings, TPageSettings]{}
-	err := result.discoverKindeRoot(p.options.StartFolder)
+	project := &KindeProject[TWorkflowSettings, TPageSettings]{
+		Environment: KindeEnvironment[TWorkflowSettings, TPageSettings]{
+			discoveryOptions: p.options,
+		},
+	}
+
+	err := project.discoverKindeRoot(p.options.StartFolder)
 	if err != nil {
 		return nil, err
 	}
 
-	result.Environment.discoverWorkflows(ctx, filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
-	result.Environment.discoverPages(ctx, filepath.Join(result.Configuration.AbsLocation, result.Configuration.RootDir))
+	project.Environment.discoverWorkflows(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
+	project.Environment.discoverPages(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
 
-	return result, nil
+	return project, nil
 }
 
 func (kp *KindeProject[TWorkflowSettings, TPageSettings]) discoverKindeRoot(startFolder string) error {
@@ -185,21 +193,23 @@ func (*KindeProject[TWorkflowSettings, TPageSettings]) readProjectConfiguration(
 	return result, nil
 }
 
-func (kw *KindeWorkflow[TSettings]) bundleAndIntrospect(ctx context.Context) {
+func (kw *KindeWorkflow[TSettings]) bundleAndIntrospect(ctx context.Context, onDiscovered func(bundle *bundler.BundlerResult[TSettings])) {
 	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TSettings]{
 		WorkingFolder:       kw.WorkflowRootDirectory,
 		EntryPoints:         kw.EntryPoints,
 		IntrospectionExport: "workflowSettings",
+		OnDiscovered:        onDiscovered,
 	})
 	bundlerResult := workflowBuilder.Bundle(ctx)
 	kw.Bundle = bundlerResult
 }
 
-func (kw *KindePage[TSettings]) bundleAndIntrospect(ctx context.Context) {
+func (kw *KindePage[TSettings]) bundleAndIntrospect(ctx context.Context, onDiscovered func(bundle *bundler.BundlerResult[TSettings])) {
 	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TSettings]{
 		WorkingFolder:       kw.RootDirectory,
 		EntryPoints:         kw.EntryPoints,
 		IntrospectionExport: "pageSettings",
+		OnDiscovered:        onDiscovered,
 	})
 	bundlerResult := workflowBuilder.Bundle(ctx)
 	kw.Bundle = bundlerResult
