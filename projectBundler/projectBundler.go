@@ -14,7 +14,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	ProjectSettingsContextKey projectSettings = "projectSettings"
+)
+
 type (
+	projectSettings string
+
 	ProjectConfiguration struct {
 		Version     string `json:"version"`
 		RootDir     string `json:"rootDir"`
@@ -46,8 +52,8 @@ type (
 
 	DiscoveryOptions[TWorkflowSettings, TPageSettings any] struct {
 		StartFolder          string
-		OnWorkflowDiscovered func(bundle *bundler.BundlerResult[TWorkflowSettings])
-		OnPageDiscovered     func(bundle *bundler.BundlerResult[TPageSettings])
+		OnWorkflowDiscovered func(ctx context.Context, bundle *bundler.BundlerResult[TWorkflowSettings])
+		OnPageDiscovered     func(ctx context.Context, bundle *bundler.BundlerResult[TPageSettings])
 	}
 
 	ProjectBundler[TWorkflowSettings, TPageSettings any] interface {
@@ -137,6 +143,8 @@ func (p *projectBundler[TWorkflowSettings, TPageSettings]) Discover(ctx context.
 		return nil, err
 	}
 
+	ctx = context.WithValue(ctx, ProjectSettingsContextKey, project.Configuration)
+
 	project.Environment.discoverWorkflows(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
 	project.Environment.discoverPages(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
 
@@ -193,7 +201,7 @@ func (*KindeProject[TWorkflowSettings, TPageSettings]) readProjectConfiguration(
 	return result, nil
 }
 
-func (kw *KindeWorkflow[TSettings]) bundleAndIntrospect(ctx context.Context, onDiscovered func(bundle *bundler.BundlerResult[TSettings])) {
+func (kw *KindeWorkflow[TSettings]) bundleAndIntrospect(ctx context.Context, onDiscovered func(ctx context.Context, bundle *bundler.BundlerResult[TSettings])) {
 	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TSettings]{
 		WorkingFolder:       kw.WorkflowRootDirectory,
 		EntryPoints:         kw.EntryPoints,
@@ -204,7 +212,7 @@ func (kw *KindeWorkflow[TSettings]) bundleAndIntrospect(ctx context.Context, onD
 	kw.Bundle = bundlerResult
 }
 
-func (kw *KindePage[TSettings]) bundleAndIntrospect(ctx context.Context, onDiscovered func(bundle *bundler.BundlerResult[TSettings])) {
+func (kw *KindePage[TSettings]) bundleAndIntrospect(ctx context.Context, onDiscovered func(ctx context.Context, bundle *bundler.BundlerResult[TSettings])) {
 	workflowBuilder := bundler.NewWorkflowBundler(bundler.BundlerOptions[TSettings]{
 		WorkingFolder:       kw.RootDirectory,
 		EntryPoints:         kw.EntryPoints,
