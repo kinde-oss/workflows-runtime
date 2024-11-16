@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	ProjectSettingsContextKey projectSettings = "projectSettings"
+	ProjectSettingsContextKey ProjectSettings = "projectSettings"
 )
 
 type (
-	projectSettings string
+	ProjectSettings string
 
 	ProjectConfiguration struct {
 		Version     string `json:"version"`

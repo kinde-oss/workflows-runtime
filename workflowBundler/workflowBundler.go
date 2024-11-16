@@ -11,10 +11,10 @@ import (
 	runtimesRegistry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
-const pluginsKey BundlerContext = "bundlerPlugins"
+const pluginsKey bundlerContext = "bundlerPlugins"
 
 type (
-	BundlerContext string
+	bundlerContext string
 
 	WorkflowSettings[TSettings any] struct {
 		Bindings map[string]runtimesRegistry.BindingSettings `json:"bindings"`
