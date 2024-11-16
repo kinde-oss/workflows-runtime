@@ -10,6 +10,9 @@ import (
 )
 
 func Test_ProjectBunler(t *testing.T) {
+
+	assert := assert.New(t)
+
 	somePathInsideProject, _ := filepath.Abs("../testData/kindeSrc/environment") //starting in a middle of nowhere, so we need to go up to the root of the project
 
 	type workflowSettings struct {
@@ -23,17 +26,19 @@ func Test_ProjectBunler(t *testing.T) {
 	onPageDiscoveredCalled := 0
 	projectBundler := NewProjectBundler(DiscoveryOptions[workflowSettings, pageSettings]{
 		StartFolder: somePathInsideProject,
-		OnWorkflowDiscovered: func(bundle *bundler.BundlerResult[workflowSettings]) {
+		OnWorkflowDiscovered: func(ctx context.Context, bundle *bundler.BundlerResult[workflowSettings]) {
 			onWorkflowDiscoveredCalled++
+			settings := ctx.Value(ProjectSettingsContextKey)
+			assert.NotNil(settings)
 		},
-		OnPageDiscovered: func(bundle *bundler.BundlerResult[pageSettings]) {
+		OnPageDiscovered: func(ctx context.Context, bundle *bundler.BundlerResult[pageSettings]) {
 			onPageDiscoveredCalled++
+			settings := ctx.Value(ProjectSettingsContextKey)
+			assert.NotNil(settings)
 		},
 	})
 
 	kindeProject, discoveryError := projectBundler.Discover(context.Background())
-
-	assert := assert.New(t)
 
 	if !assert.Nil(discoveryError) {
 		t.FailNow()

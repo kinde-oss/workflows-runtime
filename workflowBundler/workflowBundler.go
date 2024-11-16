@@ -11,10 +11,10 @@ import (
 	runtimesRegistry "github.com/kinde-oss/workflows-runtime/registry"
 )
 
-const pluginsKey bundlerContext = "bundlerPlugins"
+const pluginsKey BundlerContext = "bundlerPlugins"
 
 type (
-	bundlerContext string
+	BundlerContext string
 
 	WorkflowSettings[TSettings any] struct {
 		Bindings map[string]runtimesRegistry.BindingSettings `json:"bindings"`
@@ -37,7 +37,7 @@ type (
 		WorkingFolder       string
 		EntryPoints         []string
 		IntrospectionExport string
-		OnDiscovered        func(bundle *BundlerResult[TSettings])
+		OnDiscovered        func(ctx context.Context, bundle *BundlerResult[TSettings])
 	}
 
 	WorkflowBundler[TSettings any] interface {
@@ -122,7 +122,7 @@ func (b *builder[TSettings]) Bundle(ctx context.Context) BundlerResult[TSettings
 	}
 
 	if b.bundleOptions.OnDiscovered != nil {
-		b.bundleOptions.OnDiscovered(&result)
+		b.bundleOptions.OnDiscovered(ctx, &result)
 	}
 
 	return result
