@@ -24,16 +24,21 @@ func Test_ProjectBunler(t *testing.T) {
 
 	onWorkflowDiscoveredCalled := 0
 	onPageDiscoveredCalled := 0
+	onRootDiscovered := false
 	projectBundler := NewProjectBundler(DiscoveryOptions[workflowSettings, pageSettings]{
 		StartFolder: somePathInsideProject,
+		OnRootDiscovered: func(ctx context.Context, bundle ProjectConfiguration) {
+			onRootDiscovered = true
+			assert.True(onRootDiscovered)
+		},
 		OnWorkflowDiscovered: func(ctx context.Context, bundle *bundler.BundlerResult[workflowSettings]) {
 			onWorkflowDiscoveredCalled++
-			settings := ctx.Value(ProjectSettingsContextKey)
+			settings := GetProjectConfiguration(ctx)
 			assert.NotNil(settings)
 		},
 		OnPageDiscovered: func(ctx context.Context, bundle *bundler.BundlerResult[pageSettings]) {
 			onPageDiscoveredCalled++
-			settings := ctx.Value(ProjectSettingsContextKey)
+			settings := GetProjectConfiguration(ctx)
 			assert.NotNil(settings)
 		},
 	})

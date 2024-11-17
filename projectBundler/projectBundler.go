@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	ProjectSettingsContextKey ProjectSettings = "projectSettings"
+	projectSettingsContextKey projectSettings = "projectSettings"
 )
 
 type (
-	ProjectSettings string
+	projectSettings string
 
 	ProjectConfiguration struct {
 		Version     string `json:"version"`
@@ -52,6 +52,7 @@ type (
 
 	DiscoveryOptions[TWorkflowSettings, TPageSettings any] struct {
 		StartFolder          string
+		OnRootDiscovered     func(ctx context.Context, bundle ProjectConfiguration)
 		OnWorkflowDiscovered func(ctx context.Context, bundle *bundler.BundlerResult[TWorkflowSettings])
 		OnPageDiscovered     func(ctx context.Context, bundle *bundler.BundlerResult[TPageSettings])
 	}
@@ -64,6 +65,13 @@ type (
 		options DiscoveryOptions[TWorkflowSettings, TPageSettings]
 	}
 )
+
+func GetProjectConfiguration(ctx context.Context) *ProjectConfiguration {
+	if val, ok := ctx.Value(projectSettingsContextKey).(ProjectConfiguration); ok {
+		return &val
+	}
+	return nil
+}
 
 func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverWorkflows(ctx context.Context, absLocation string) {
 	//environment/workflows
@@ -143,7 +151,11 @@ func (p *projectBundler[TWorkflowSettings, TPageSettings]) Discover(ctx context.
 		return nil, err
 	}
 
-	ctx = context.WithValue(ctx, ProjectSettingsContextKey, project.Configuration)
+	ctx = context.WithValue(ctx, projectSettingsContextKey, project.Configuration)
+
+	if p.options.OnRootDiscovered != nil {
+		p.options.OnRootDiscovered(ctx, project.Configuration)
+	}
 
 	project.Environment.discoverWorkflows(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
 	project.Environment.discoverPages(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
