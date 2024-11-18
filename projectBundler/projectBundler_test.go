@@ -43,10 +43,10 @@ func Test_ProjectBunler(t *testing.T) {
 			onPageDiscoveredCalled++
 			config := GetProjectConfiguration(ctx)
 			assert.NotNil(config)
-			pagesPath := path.Join(config.AbsLocation, config.RootDir, "environment/pages")
+			pagesPath := path.Join(config.AbsLocation, config.RootDir, "environment", "pages")
 			entryPoint := bundle.Content.BundlingOptions.EntryPoints[0]
 			relPath, _ := filepath.Rel(pagesPath, path.Join(bundle.Content.BundlingOptions.WorkingFolder, entryPoint))
-			cleanedPath := path.Clean(fmt.Sprintf("/%v", relPath))
+			cleanedPath := path.Clean(fmt.Sprintf("%v", relPath))
 			bundle.Content.Settings.Other.Route = cleanedPath
 		},
 	})
