@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -39,6 +40,10 @@ func Test_WorkflowBundler(t *testing.T) {
 	bundlerResult := workflowBuilder.Bundle(ctx)
 
 	assert := assert.New(t)
+
+	_, err := json.Marshal(bundlerResult)
+	assert.Nil(err)
+
 	assert.True(pluginSetupWasCalled, "plugin setup was not called")
 	assert.Equal(bundlerResult.Errors[0], "ID is required")
 	assert.NotEmpty(bundlerResult.Content.Source)

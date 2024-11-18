@@ -35,10 +35,10 @@ type (
 	}
 
 	BundlerOptions[TSettings any] struct {
-		WorkingFolder       string
-		EntryPoints         []string
-		IntrospectionExport string
-		OnDiscovered        func(ctx context.Context, bundle *BundlerResult[TSettings])
+		WorkingFolder       string                                                      `json:"working_folder"`
+		EntryPoints         []string                                                    `json:"entry_points"`
+		IntrospectionExport string                                                      `json:"introspection_export"`
+		OnDiscovered        func(ctx context.Context, bundle *BundlerResult[TSettings]) `json:"-"`
 	}
 
 	WorkflowBundler[TSettings any] interface {
