@@ -2,6 +2,8 @@ package project_bundler
 
 import (
 	"context"
+	"fmt"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -20,21 +22,32 @@ func Test_ProjectBunler(t *testing.T) {
 	}
 
 	type pageSettings struct {
+		Route string `json:"route"`
 	}
 
 	onWorkflowDiscoveredCalled := 0
 	onPageDiscoveredCalled := 0
+	onRootDiscovered := false
 	projectBundler := NewProjectBundler(DiscoveryOptions[workflowSettings, pageSettings]{
 		StartFolder: somePathInsideProject,
+		OnRootDiscovered: func(ctx context.Context, bundle ProjectConfiguration) {
+			onRootDiscovered = true
+			assert.True(onRootDiscovered)
+		},
 		OnWorkflowDiscovered: func(ctx context.Context, bundle *bundler.BundlerResult[workflowSettings]) {
 			onWorkflowDiscoveredCalled++
-			settings := ctx.Value(ProjectSettingsContextKey)
+			settings := GetProjectConfiguration(ctx)
 			assert.NotNil(settings)
 		},
 		OnPageDiscovered: func(ctx context.Context, bundle *bundler.BundlerResult[pageSettings]) {
 			onPageDiscoveredCalled++
-			settings := ctx.Value(ProjectSettingsContextKey)
-			assert.NotNil(settings)
+			config := GetProjectConfiguration(ctx)
+			assert.NotNil(config)
+			pagesPath := path.Join(config.AbsLocation, config.RootDir, "environment", "pages")
+			entryPoint := bundle.Content.BundlingOptions.EntryPoints[0]
+			relPath, _ := filepath.Rel(pagesPath, path.Join(bundle.Content.BundlingOptions.WorkingFolder, entryPoint))
+			cleanedPath := path.Clean(fmt.Sprintf("%v", relPath))
+			bundle.Content.Settings.Other.Route = cleanedPath
 		},
 	})
 
@@ -55,6 +68,7 @@ func Test_ProjectBunler(t *testing.T) {
 
 	assert.Equal(2, len(kindeProject.Environment.Pages))
 	assert.Empty(kindeProject.Environment.Pages[0].Bundle.Errors)
+	assert.NotEmpty(kindeProject.Environment.Pages[0].Bundle.Content.Settings.Other.Route)
 	assert.Empty(kindeProject.Environment.Pages[1].Bundle.Errors)
-
+	assert.NotEmpty(kindeProject.Environment.Pages[1].Bundle.Content.Settings.Other.Route)
 }

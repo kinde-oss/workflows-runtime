@@ -22,9 +22,10 @@ type (
 	}
 
 	BundledContent[TSettings any] struct {
-		Source     []byte                      `json:"source"`
-		BundleHash string                      `json:"hash"`
-		Settings   WorkflowSettings[TSettings] `json:"settings"`
+		Source          []byte                      `json:"source"`
+		BundleHash      string                      `json:"hash"`
+		Settings        WorkflowSettings[TSettings] `json:"settings"`
+		BundlingOptions BundlerOptions[TSettings]   `json:"bundling_options"`
 	}
 
 	BundlerResult[TSettings any] struct {
@@ -109,9 +110,10 @@ func (b *builder[TSettings]) Bundle(ctx context.Context) BundlerResult[TSettings
 
 		file := tr.OutputFiles[0]
 		result.Content = BundledContent[TSettings]{
-			Source:     file.Contents,
-			BundleHash: file.Hash,
-			Settings:   result.discoverSettings(b.bundleOptions.IntrospectionExport, file.Contents),
+			Source:          file.Contents,
+			BundleHash:      file.Hash,
+			Settings:        result.discoverSettings(b.bundleOptions.IntrospectionExport, file.Contents),
+			BundlingOptions: b.bundleOptions,
 		}
 
 	}

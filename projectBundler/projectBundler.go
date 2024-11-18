@@ -15,47 +15,55 @@ import (
 )
 
 const (
-	ProjectSettingsContextKey ProjectSettings = "projectSettings"
+	projectSettingsContextKey projectSettings = "projectSettings"
 )
 
 type (
-	ProjectSettings string
+	projectSettings string
 
+	// ProjectConfiguration is the struct that holds the project configuration.
 	ProjectConfiguration struct {
 		Version     string `json:"version"`
 		RootDir     string `json:"rootDir"`
 		AbsLocation string `json:"location"`
 	}
 
+	// KindeWorkflow is the struct that holds the workflow configuration.
 	KindeWorkflow[TSettings any] struct {
 		WorkflowRootDirectory string                           `json:"workflow_root_directory"`
 		EntryPoints           []string                         `json:"entry_points"`
 		Bundle                bundler.BundlerResult[TSettings] `json:"bundle"`
 	}
 
+	// KindePage is the struct that holds the page configuration.
 	KindePage[TSettings any] struct {
 		RootDirectory string                           `json:"root_directory"`
 		EntryPoints   []string                         `json:"entry_points"`
 		Bundle        bundler.BundlerResult[TSettings] `json:"bundle"`
 	}
 
+	// KindeEnvironment is the struct that holds the workflows and pages.
 	KindeEnvironment[TWorkflowSettings, TPageSettings any] struct {
 		Workflows        []KindeWorkflow[TWorkflowSettings] `json:"workflows"`
 		Pages            []KindePage[TPageSettings]         `json:"pages"`
 		discoveryOptions DiscoveryOptions[TWorkflowSettings, TPageSettings]
 	}
 
+	// KindeProject is the struct that holds the project configuration and the environment.
 	KindeProject[TWorkflowSettings, TPageSettings any] struct {
 		Configuration ProjectConfiguration                               `json:"configuration"`
 		Environment   KindeEnvironment[TWorkflowSettings, TPageSettings] `json:"environment"`
 	}
 
+	// DiscoveryOptions is the struct that holds the options for the project discovery.
 	DiscoveryOptions[TWorkflowSettings, TPageSettings any] struct {
 		StartFolder          string
+		OnRootDiscovered     func(ctx context.Context, bundle ProjectConfiguration)
 		OnWorkflowDiscovered func(ctx context.Context, bundle *bundler.BundlerResult[TWorkflowSettings])
 		OnPageDiscovered     func(ctx context.Context, bundle *bundler.BundlerResult[TPageSettings])
 	}
 
+	// ProjectBundler is the interface that wraps the Discover method.
 	ProjectBundler[TWorkflowSettings, TPageSettings any] interface {
 		Discover(ctx context.Context) (*KindeProject[TWorkflowSettings, TPageSettings], error)
 	}
@@ -64,6 +72,15 @@ type (
 		options DiscoveryOptions[TWorkflowSettings, TPageSettings]
 	}
 )
+
+// GetProjectConfiguration returns the project configuration from the context.
+// If the configuration is not found, it returns nil.
+func GetProjectConfiguration(ctx context.Context) *ProjectConfiguration {
+	if val, ok := ctx.Value(projectSettingsContextKey).(ProjectConfiguration); ok {
+		return &val
+	}
+	return nil
+}
 
 func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverWorkflows(ctx context.Context, absLocation string) {
 	//environment/workflows
@@ -130,7 +147,7 @@ func maybeAddPage[TWorkflowSettings, TPageSettings any](ctx context.Context, fil
 	}
 }
 
-// Discover implements ProjectBundler.
+// Discover discovers the project and returns the project configuration and the environment.
 func (p *projectBundler[TWorkflowSettings, TPageSettings]) Discover(ctx context.Context) (*KindeProject[TWorkflowSettings, TPageSettings], error) {
 	project := &KindeProject[TWorkflowSettings, TPageSettings]{
 		Environment: KindeEnvironment[TWorkflowSettings, TPageSettings]{
@@ -143,7 +160,11 @@ func (p *projectBundler[TWorkflowSettings, TPageSettings]) Discover(ctx context.
 		return nil, err
 	}
 
-	ctx = context.WithValue(ctx, ProjectSettingsContextKey, project.Configuration)
+	ctx = context.WithValue(ctx, projectSettingsContextKey, project.Configuration)
+
+	if p.options.OnRootDiscovered != nil {
+		p.options.OnRootDiscovered(ctx, project.Configuration)
+	}
 
 	project.Environment.discoverWorkflows(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
 	project.Environment.discoverPages(ctx, filepath.Join(project.Configuration.AbsLocation, project.Configuration.RootDir))
@@ -180,6 +201,7 @@ func (kp *KindeProject[TWorkflowSettings, TPageSettings]) discoverKindeRoot(star
 
 }
 
+// NewProjectBundler returns a new instance of ProjectBundler.
 func NewProjectBundler[TWorkflowSettings, TPageSettings any](discoveryOptions DiscoveryOptions[TWorkflowSettings, TPageSettings]) ProjectBundler[TWorkflowSettings, TPageSettings] {
 	return &projectBundler[TWorkflowSettings, TPageSettings]{
 		options: discoveryOptions,
