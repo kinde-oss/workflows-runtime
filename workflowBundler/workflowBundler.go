@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
@@ -32,6 +33,7 @@ type (
 		Content           BundledContent[TSettings] `json:"bundle"`
 		Errors            []string                  `json:"errors"`
 		CompilationErrors []interface{}             `json:"compilation_errors"`
+		Warnings          []string                  `json:"warnings"`
 	}
 
 	BundlerOptions[TSettings any] struct {
@@ -109,10 +111,16 @@ func (b *builder[TSettings]) Bundle(ctx context.Context) BundlerResult[TSettings
 		}
 
 		file := tr.OutputFiles[0]
+
+		settings, settingsDiscoveryErr := result.discoverSettings(b.bundleOptions.IntrospectionExport, file.Contents)
+
+		if settingsDiscoveryErr != nil {
+			result.addWarning(settingsDiscoveryErr)
+		}
 		result.Content = BundledContent[TSettings]{
 			Source:          file.Contents,
 			BundleHash:      file.Hash,
-			Settings:        result.discoverSettings(b.bundleOptions.IntrospectionExport, file.Contents),
+			Settings:        settings,
 			BundlingOptions: b.bundleOptions,
 		}
 
@@ -120,7 +128,6 @@ func (b *builder[TSettings]) Bundle(ctx context.Context) BundlerResult[TSettings
 
 	for _, buildError := range tr.Errors {
 		result.addCompilationError(buildError)
-
 	}
 
 	if b.bundleOptions.OnDiscovered != nil {
@@ -142,7 +149,11 @@ func (br *BundlerResult[TSettings]) addError(err error) {
 	br.Errors = append(br.Errors, err.Error())
 }
 
-func (br *BundlerResult[TSettings]) discoverSettings(exportName string, source []byte) WorkflowSettings[TSettings] {
+func (br *BundlerResult[TSettings]) addWarning(warn error) {
+	br.Warnings = append(br.Warnings, warn.Error())
+}
+
+func (br *BundlerResult[TSettings]) discoverSettings(exportName string, source []byte) (WorkflowSettings[TSettings], error) {
 	goja, _ := runtimesRegistry.ResolveRuntime("goja")
 	introspectResult, _ := goja.Introspect(context.Background(),
 		runtimesRegistry.WorkflowDescriptor{
@@ -158,6 +169,10 @@ func (br *BundlerResult[TSettings]) discoverSettings(exportName string, source [
 			Exports: []string{exportName},
 		})
 
+	if introspectResult == nil {
+		return WorkflowSettings[TSettings]{}, fmt.Errorf("export %v not found", exportName)
+	}
+
 	export := introspectResult.GetExport(exportName)
 
 	asMap := export.ValueAsMap()
@@ -167,7 +182,7 @@ func (br *BundlerResult[TSettings]) discoverSettings(exportName string, source [
 
 	json.Unmarshal(res, &result)
 
-	return result
+	return result, nil
 
 }
 

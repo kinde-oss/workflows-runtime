@@ -137,7 +137,7 @@ func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverPages(ctx 
 
 func maybeAddPage[TWorkflowSettings, TPageSettings any](ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) {
 	fileName := strings.ToLower(file)
-	if strings.HasSuffix(fileName, "page.ts") || strings.HasSuffix(fileName, "page.js") || strings.HasSuffix(fileName, "page.tsx") || strings.HasSuffix(fileName, "page.jsx") {
+	if strings.EqualFold(fileName, "page.ts") || strings.EqualFold(fileName, "page.js") || strings.EqualFold(fileName, "page.tsx") || strings.EqualFold(fileName, "page.jsx") {
 		discoveredPage := KindePage[TPageSettings]{
 			RootDirectory: rootDirectory,
 			EntryPoints:   []string{file},
