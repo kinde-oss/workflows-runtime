@@ -309,6 +309,14 @@ func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry
 		}
 	}
 
+	defaultExport := exports.Get("default")
+	if defaultExport == nil {
+		return nil, fmt.Errorf("no default export")
+	}
+	if _, ok := goja.AssertFunction(defaultExport); !ok {
+		return nil, fmt.Errorf("no default function exported")
+	}
+
 	return introspectionResult, nil
 }
 
