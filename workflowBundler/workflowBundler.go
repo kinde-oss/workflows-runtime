@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
@@ -32,6 +33,8 @@ type (
 		Content           BundledContent[TSettings] `json:"bundle"`
 		Errors            []string                  `json:"errors"`
 		CompilationErrors []interface{}             `json:"compilation_errors"`
+		Warnings          []string                  `json:"warnings"`
+		DefaultExports    []string                  `json:"default_exports"`
 	}
 
 	BundlerOptions[TSettings any] struct {
@@ -109,10 +112,21 @@ func (b *builder[TSettings]) Bundle(ctx context.Context) BundlerResult[TSettings
 		}
 
 		file := tr.OutputFiles[0]
+
+		settings, settingsDiscoveryWarn, discoveryErr := result.discoverSettingsAndExports(b.bundleOptions.IntrospectionExport, file.Contents)
+
+		if settingsDiscoveryWarn != nil {
+			result.addWarning(settingsDiscoveryWarn)
+		}
+
+		if discoveryErr != nil {
+			result.addError(discoveryErr)
+		}
+
 		result.Content = BundledContent[TSettings]{
 			Source:          file.Contents,
 			BundleHash:      file.Hash,
-			Settings:        result.discoverSettings(b.bundleOptions.IntrospectionExport, file.Contents),
+			Settings:        settings,
 			BundlingOptions: b.bundleOptions,
 		}
 
@@ -120,7 +134,6 @@ func (b *builder[TSettings]) Bundle(ctx context.Context) BundlerResult[TSettings
 
 	for _, buildError := range tr.Errors {
 		result.addCompilationError(buildError)
-
 	}
 
 	if b.bundleOptions.OnDiscovered != nil {
@@ -142,9 +155,13 @@ func (br *BundlerResult[TSettings]) addError(err error) {
 	br.Errors = append(br.Errors, err.Error())
 }
 
-func (br *BundlerResult[TSettings]) discoverSettings(exportName string, source []byte) WorkflowSettings[TSettings] {
+func (br *BundlerResult[TSettings]) addWarning(warn error) {
+	br.Warnings = append(br.Warnings, warn.Error())
+}
+
+func (br *BundlerResult[TSettings]) discoverSettingsAndExports(exportName string, source []byte) (r WorkflowSettings[TSettings], warn error, err error) {
 	goja, _ := runtimesRegistry.ResolveRuntime("goja")
-	introspectResult, _ := goja.Introspect(context.Background(),
+	introspectResult, err := goja.Introspect(context.Background(),
 		runtimesRegistry.WorkflowDescriptor{
 			ProcessedSource: runtimesRegistry.SourceDescriptor{
 				Source:     source,
@@ -158,6 +175,14 @@ func (br *BundlerResult[TSettings]) discoverSettings(exportName string, source [
 			Exports: []string{exportName},
 		})
 
+	if introspectResult == nil {
+		return WorkflowSettings[TSettings]{}, fmt.Errorf("export %v not found", exportName), err
+	}
+
+	if err != nil {
+		return WorkflowSettings[TSettings]{}, nil, err
+	}
+
 	export := introspectResult.GetExport(exportName)
 
 	asMap := export.ValueAsMap()
@@ -167,8 +192,7 @@ func (br *BundlerResult[TSettings]) discoverSettings(exportName string, source [
 
 	json.Unmarshal(res, &result)
 
-	return result
-
+	return result, nil, nil
 }
 
 func (settings *WorkflowSettings[TSettings]) UnmarshalJSON(data []byte) error {

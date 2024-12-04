@@ -69,6 +69,7 @@ func Test_ProjectBunler(t *testing.T) {
 	assert.Equal(2, len(kindeProject.Environment.Pages))
 	assert.Empty(kindeProject.Environment.Pages[0].Bundle.Errors)
 	assert.NotEmpty(kindeProject.Environment.Pages[0].Bundle.Content.Settings.Other.Route)
-	assert.Empty(kindeProject.Environment.Pages[1].Bundle.Errors)
+	assert.NotEmpty(kindeProject.Environment.Pages[1].Bundle.Errors)
+	assert.Equal("no default export", kindeProject.Environment.Pages[1].Bundle.Errors[0])
 	assert.NotEmpty(kindeProject.Environment.Pages[1].Bundle.Content.Settings.Other.Route)
 }

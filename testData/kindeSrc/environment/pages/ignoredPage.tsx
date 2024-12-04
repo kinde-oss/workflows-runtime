@@ -1,0 +1,1 @@
+//this would not be discovered, because of the file name not one of "page.[ts, js, tsx, jsx]"
