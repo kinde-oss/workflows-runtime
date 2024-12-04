@@ -130,7 +130,7 @@ func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverPages(ctx 
 			return err
 		}
 		if _, ok := discoveredFolders[filepath.Dir(path)]; ok {
-			return nil //skip if we already discovered this folder, so double names not clash
+			return nil //skip if we already discovered this folder, so double names not clash (precedence is js -> ts -> tsx -> jsx)
 		}
 		if !info.IsDir() {
 			if maybeAddPage(ctx, info.Name(), filepath.Dir(path), kw) {
