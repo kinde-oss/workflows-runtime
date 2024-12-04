@@ -123,19 +123,26 @@ func (kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) discoverPages(ctx 
 		log.Warn().Msgf("could not find pages folder: %s", pagesPath)
 	}
 
+	discoveredFolders := make(map[string]bool)
+
 	filepath.Walk(pagesPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+		if _, ok := discoveredFolders[filepath.Dir(path)]; ok {
+			return nil //skip if we already discovered this folder, so double names not clash
+		}
 		if !info.IsDir() {
-			maybeAddPage(ctx, info.Name(), filepath.Dir(path), kw)
+			if maybeAddPage(ctx, info.Name(), filepath.Dir(path), kw) {
+				discoveredFolders[filepath.Dir(path)] = true
+			}
 		}
 		return nil
 	})
 
 }
 
-func maybeAddPage[TWorkflowSettings, TPageSettings any](ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) {
+func maybeAddPage[TWorkflowSettings, TPageSettings any](ctx context.Context, file string, rootDirectory string, kw *KindeEnvironment[TWorkflowSettings, TPageSettings]) bool {
 	fileName := strings.ToLower(file)
 	if strings.EqualFold(fileName, "page.ts") || strings.EqualFold(fileName, "page.js") || strings.EqualFold(fileName, "page.tsx") || strings.EqualFold(fileName, "page.jsx") {
 		discoveredPage := KindePage[TPageSettings]{
@@ -144,7 +151,9 @@ func maybeAddPage[TWorkflowSettings, TPageSettings any](ctx context.Context, fil
 		}
 		discoveredPage.bundleAndIntrospect(ctx, kw.discoveryOptions.OnPageDiscovered)
 		kw.Pages = append(kw.Pages, discoveredPage)
+		return true
 	}
+	return false
 }
 
 // Discover discovers the project and returns the project configuration and the environment.
