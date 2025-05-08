@@ -319,7 +319,6 @@ func (e *GojaRunnerV1) Introspect(ctx context.Context, workflow runtimesRegistry
 		}
 	}
 
-
 	return introspectionResult, defaultErr
 }
 
@@ -341,13 +340,13 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	module := vm.Get("module").ToObject(vm)
 	exportsJs := module.Get("exports")
 	if exportsJs == nil {
-		return nil, fmt.Errorf("no exports found")
+		return executionResult, fmt.Errorf("no exports found")
 	}
 	exports := exportsJs.ToObject(vm)
 
 	defaultExport := exports.Get("default")
 	if defaultExport == nil {
-		return nil, fmt.Errorf("no default export")
+		return executionResult, fmt.Errorf("no default export")
 	}
 
 	var callableFunction goja.Callable
@@ -356,7 +355,7 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	} else {
 		targetVmFunction := defaultExport.ToObject(vm).Get(startOptions.EntryPoint)
 		if targetVmFunction == nil {
-			return nil, fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
+			return executionResult, fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
 		}
 		vm.ExportTo(targetVmFunction, &callableFunction)
 	}
@@ -369,7 +368,7 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 	result, err := callableFunction(nil, functionParams...)
 
 	if err != nil {
-		return nil, fmt.Errorf("%v", err.Error())
+		return executionResult, fmt.Errorf("%v", err.Error())
 	}
 
 	promise := result.Export().(*goja.Promise)
@@ -384,10 +383,10 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 			if exportedResult != nil && stackExport != nil {
 				errorText := fmt.Sprintf("%v", stackExport.Export())
 				errorText = strings.ReplaceAll(errorText, "GoError: ", "")
-				return nil, fmt.Errorf("%v", errorText)
+				return executionResult, fmt.Errorf("%v", errorText)
 			}
 
-			return nil, fmt.Errorf("%v", returnedError)
+			return executionResult, fmt.Errorf("%v", returnedError)
 		}
 		if promise.State() != goja.PromiseStatePending {
 			break
