@@ -93,7 +93,7 @@ func Test_GojaLogVmInits(t *testing.T) {
 func Test_GojaPrecompiledRuntime(t *testing.T) {
 	runner := getGojaRunner()
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 
 		workflowRuncontext := context.WithValue(context.Background(), testContextValue, "test"+fmt.Sprint(i))
 
