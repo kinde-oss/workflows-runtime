@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -333,71 +334,77 @@ func (e *GojaRunnerV1) Execute(ctx context.Context, workflow runtimesRegistry.Wo
 		return executionResult, returnErr
 	}
 
-	defer func(startedAt time.Time) {
-		executionResult.RunMetadata.ExecutionDuration = time.Since(startedAt)
-	}(executionResult.RunMetadata.StartedAt)
+	vmExecFunction := func(ctx context.Context) error {
 
-	module := vm.Get("module").ToObject(vm)
-	exportsJs := module.Get("exports")
-	if exportsJs == nil {
-		return executionResult, fmt.Errorf("no exports found")
-	}
-	exports := exportsJs.ToObject(vm)
+		defer func(startedAt time.Time) {
+			executionResult.RunMetadata.ExecutionDuration = time.Since(startedAt)
+		}(executionResult.RunMetadata.StartedAt)
 
-	defaultExport := exports.Get("default")
-	if defaultExport == nil {
-		return executionResult, fmt.Errorf("no default export")
-	}
-
-	var callableFunction goja.Callable
-	if callabla, isFunction := goja.AssertFunction(defaultExport); isFunction {
-		callableFunction = callabla
-	} else {
-		targetVmFunction := defaultExport.ToObject(vm).Get(startOptions.EntryPoint)
-		if targetVmFunction == nil {
-			return executionResult, fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
+		module := vm.Get("module").ToObject(vm)
+		exportsJs := module.Get("exports")
+		if exportsJs == nil {
+			return fmt.Errorf("no exports found")
 		}
-		vm.ExportTo(targetVmFunction, &callableFunction)
-	}
+		exports := exportsJs.ToObject(vm)
 
-	functionParams := []goja.Value{}
-	for _, arg := range startOptions.Arguments {
-		functionParams = append(functionParams, vm.ToValue(arg))
-	}
+		defaultExport := exports.Get("default")
+		if defaultExport == nil {
+			return fmt.Errorf("no default export")
+		}
 
-	result, err := callableFunction(nil, functionParams...)
-
-	if err != nil {
-		return executionResult, fmt.Errorf("%v", err.Error())
-	}
-
-	promise := result.Export().(*goja.Promise)
-	for {
-		if promise.State() == goja.PromiseStateRejected {
-			returnedError := promise.Result().String()
-
-			returnedError = strings.ReplaceAll(returnedError, "GoError: ", "")
-
-			exportedResult := promise.Result().ToObject(vm)
-			stackExport := exportedResult.Get("stack")
-			if exportedResult != nil && stackExport != nil {
-				errorText := fmt.Sprintf("%v", stackExport.Export())
-				errorText = strings.ReplaceAll(errorText, "GoError: ", "")
-				return executionResult, fmt.Errorf("%v", errorText)
+		var callableFunction goja.Callable
+		if callabla, isFunction := goja.AssertFunction(defaultExport); isFunction {
+			callableFunction = callabla
+		} else {
+			targetVmFunction := defaultExport.ToObject(vm).Get(startOptions.EntryPoint)
+			if targetVmFunction == nil {
+				return fmt.Errorf("could not find default exported function %v", startOptions.EntryPoint)
 			}
+			vm.ExportTo(targetVmFunction, &callableFunction)
+		}
 
-			return executionResult, fmt.Errorf("%v", returnedError)
+		functionParams := []goja.Value{}
+		for _, arg := range startOptions.Arguments {
+			functionParams = append(functionParams, vm.ToValue(arg))
 		}
-		if promise.State() != goja.PromiseStatePending {
-			break
+
+		result, err := callableFunction(nil, functionParams...)
+
+		if err != nil {
+			return fmt.Errorf("%v", err.Error())
 		}
-		time.Sleep(1 * time.Millisecond)
+
+		promise := result.Export().(*goja.Promise)
+		for {
+			if promise.State() == goja.PromiseStateRejected {
+				returnedError := promise.Result().String()
+
+				returnedError = strings.ReplaceAll(returnedError, "GoError: ", "")
+
+				exportedResult := promise.Result().ToObject(vm)
+				stackExport := exportedResult.Get("stack")
+				if exportedResult != nil && stackExport != nil {
+					errorText := fmt.Sprintf("%v", stackExport.Export())
+					errorText = strings.ReplaceAll(errorText, "GoError: ", "")
+					return fmt.Errorf("%v", errorText)
+				}
+
+				return fmt.Errorf("%v", returnedError)
+			}
+			if promise.State() != goja.PromiseStatePending {
+				break
+			}
+			time.Sleep(1 * time.Millisecond)
+		}
+
+		executionResult.ExitResult = promise.Result().Export()
+		executionResult.RunMetadata.HasRunToCompletion = true
+		return nil
 	}
 
-	executionResult.ExitResult = promise.Result().Export()
-	executionResult.RunMetadata.HasRunToCompletion = true
+	err := asyncRun(ctx, vmExecFunction)
 
-	return executionResult, nil
+	return executionResult, err
 }
 
 func (runner *GojaRunnerV1) setupVM(ctx context.Context, vm *goja.Runtime, workflow runtimesRegistry.WorkflowDescriptor, logger runtimesRegistry.Logger) (*actionResult, error) {
@@ -491,4 +498,51 @@ func (*GojaRunnerV1) consoleEmulation(_ *goja.Runtime, mountingPoint *goja.Objec
 	mountingPoint.Set("debug", logFunc(runtimesRegistry.LogLevelDebug))
 	mountingPoint.Set("warn", logFunc(runtimesRegistry.LogLevelWarning))
 	mountingPoint.Set("error", logFunc(runtimesRegistry.LogLevelError))
+}
+
+type asyncTask func(context.Context) error
+
+func asyncRun(parent context.Context, task asyncTask) error {
+	ctx, cancel := context.WithCancel(parent)
+
+	resultChannel := make(chan error, 1)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func(fn func(context.Context) error) {
+		defer wg.Done()
+		defer safePanic(resultChannel)
+		select {
+		case <-ctx.Done():
+			return // returning not to leak the goroutine
+		case resultChannel <- fn(ctx):
+			// Just do the job
+		}
+	}(task)
+
+	go func() {
+		wg.Wait()
+		cancel()
+		close(resultChannel)
+	}()
+
+	for err := range resultChannel {
+		if err != nil {
+			cancel()
+			return err
+		}
+	}
+
+	return nil
+}
+
+func safePanic(resultChannel chan<- error) {
+	if r := recover(); r != nil {
+		resultChannel <- wrapPanic(r)
+	}
+}
+
+func wrapPanic(recovered interface{}) error {
+	return fmt.Errorf("%v", recovered)
 }
