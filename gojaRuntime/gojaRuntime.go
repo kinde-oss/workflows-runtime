@@ -471,7 +471,7 @@ func (*GojaRunnerV1) maxExecutionTimeout(ctx context.Context, vm *goja.Runtime, 
 		timer := time.NewTimer(maxExecutionDuration)
 		select {
 		case <-ctx.Done():
-			vm.Interrupt("execution time exceeded")
+			vm.Interrupt("execution cancelled by user")
 			if !timer.Stop() {
 				<-timer.C
 			}
